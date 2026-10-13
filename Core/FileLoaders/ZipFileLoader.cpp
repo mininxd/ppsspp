@@ -1,3 +1,6 @@
+#include <cstdlib>
+#include <cstring>
+
 #ifdef SHARED_LIBZIP
 #include <zip.h>
 #else
