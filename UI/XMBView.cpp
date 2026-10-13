@@ -200,11 +200,13 @@ bool XMBView::Touch(const TouchInput &touch) {
 		return true;
 	}
 
+	const float em = 24.0f;
+	const float topMargin = 2.0f * em;
 	const float anchorX = bounds_.x + std::clamp(bounds_.w * 0.22f, 110.0f, 220.0f);
-	const float catY = bounds_.y + std::clamp(bounds_.h * 0.25f, 75.0f, 150.0f);
+	const float catY = bounds_.y + topMargin + std::clamp(bounds_.h * 0.16f, 36.0f, 80.0f);
 	const float catSpacing = 88.0f;
-	const float focusY = catY + 70.0f;
-	const float itemSpacing = 48.0f;
+	const float focusY = catY + 68.0f;
+	const float itemSpacing = 54.0f;
 
 	if (touch.flags & TouchInputFlags::DOWN) {
 		touchDownX_ = touch.x;
@@ -215,41 +217,80 @@ bool XMBView::Touch(const TouchInput &touch) {
 	}
 
 	if (touch.flags & TouchInputFlags::MOVE) {
-		if (std::abs(touch.y - touchDownY_) > 12.0f) {
+		float dx = touch.x - touchDownX_;
+		float dy = touch.y - touchDownY_;
+		if (std::abs(dx) > 16.0f || std::abs(dy) > 16.0f) {
 			isDragging_ = true;
 		}
 		return true;
 	}
 
 	if (touch.flags & TouchInputFlags::UP) {
-		if (!isDragging_ && (time_now_d() - touchDownTime_ < 0.6)) {
-			// Check if click was on a category icon
+		float deltaX = touch.x - touchDownX_;
+		float deltaY = touch.y - touchDownY_;
+		double elapsed = time_now_d() - touchDownTime_;
+
+		if (isDragging_ || std::abs(deltaX) > 20.0f || std::abs(deltaY) > 20.0f) {
+			// Swipe gestures
+			if (std::abs(deltaX) > std::abs(deltaY)) {
+				// Horizontal swipe between categories
+				if (std::abs(deltaX) > 24.0f) {
+					int count = (int)std::round(std::abs(deltaX) / catSpacing);
+					count = std::clamp(count, 1, 3);
+					if (deltaX < 0) {
+						ChangeCategory(count);
+					} else {
+						ChangeCategory(-count);
+					}
+				}
+			} else {
+				// Vertical swipe between items
+				if (std::abs(deltaY) > 20.0f) {
+					int count = (int)std::round(std::abs(deltaY) / itemSpacing);
+					count = std::clamp(count, 1, 4);
+					if (deltaY < 0) {
+						ChangeItem(count);
+					} else {
+						ChangeItem(-count);
+					}
+				}
+			}
+		} else if (elapsed < 0.6) {
+			// Tap gestures
+			// 1. Check if tap was on a category icon
+			bool tappedCategory = false;
 			for (size_t i = 0; i < categories_.size(); i++) {
 				float cx = anchorX + (float)((int)i - animCatPos_) * catSpacing;
-				if (std::abs(touch.x - cx) < 36.0f && std::abs(touch.y - catY) < 36.0f) {
-					SetSelectedCategory((int)i);
-					return true;
+				if (std::abs(touch.x - cx) < 38.0f && std::abs(touch.y - catY) < 36.0f) {
+					if ((int)i != selectedCategory_) {
+						SetSelectedCategory((int)i);
+					}
+					tappedCategory = true;
+					break;
 				}
 			}
 
-			// Check if click was on vertical items of active category
-			if (selectedCategory_ >= 0 && selectedCategory_ < (int)categories_.size()) {
+			// 2. Check if tap was on vertical items of active category
+			if (!tappedCategory && selectedCategory_ >= 0 && selectedCategory_ < (int)categories_.size()) {
 				auto &cat = categories_[selectedCategory_];
 				for (size_t j = 0; j < cat.items.size(); j++) {
 					float iy = focusY + ((float)j - cat.animItemPos) * itemSpacing;
-					if (std::abs(touch.y - iy) < itemSpacing * 0.5f && touch.x >= anchorX - 32.0f && touch.x <= bounds_.x2() - 20.0f) {
+					if (std::abs(touch.y - iy) < itemSpacing * 0.5f && touch.x >= anchorX - 36.0f && touch.x <= bounds_.x2() - 20.0f) {
 						if ((int)j == cat.selectedItem) {
+							// Tap on already-highlighted item activates it
 							TriggerSelect();
 						} else {
+							// Tap on non-highlighted item slides to it without activating
 							cat.selectedItem = (int)j;
 							UpdateHighlight();
 							UI::PlayUISound(UI::UISound::SELECT);
 						}
-						return true;
+						break;
 					}
 				}
 			}
 		}
+
 		isDragging_ = false;
 		return true;
 	}
@@ -268,8 +309,10 @@ void XMBView::Draw(UIContext &dc) {
 	}
 
 	const Bounds &bounds = bounds_;
+	const float em = 24.0f;
+	const float topMargin = 2.0f * em;
 	const float anchorX = bounds.x + std::clamp(bounds.w * 0.22f, 110.0f, 220.0f);
-	const float catY = bounds.y + std::clamp(bounds.h * 0.25f, 75.0f, 150.0f);
+	const float catY = bounds.y + topMargin + std::clamp(bounds.h * 0.16f, 36.0f, 80.0f);
 
 	DrawStatusBar(dc, bounds);
 	DrawCategoryBar(dc, bounds, anchorX, catY);
@@ -279,9 +322,9 @@ void XMBView::Draw(UIContext &dc) {
 
 void XMBView::DrawStatusBar(UIContext &dc, const Bounds &bounds) {
 	// Top Left PPSSPP Branding
-	dc.Draw()->DrawImage(ImageID("I_ICON"), bounds.x + 24.0f, bounds.y + 22.0f, 0.7f, 0xFFFFFFFF, ALIGN_CENTER);
+	dc.Draw()->DrawImage(ImageID("I_ICON"), bounds.x + 24.0f, bounds.y + 20.0f, 0.7f, 0xFFFFFFFF, ALIGN_CENTER);
 	dc.SetFontStyle(dc.GetTheme().uiFontSmall);
-	dc.DrawText("PPSSPP", bounds.x + 42.0f, bounds.y + 22.0f, 0xDDFFFFFF, ALIGN_VCENTER);
+	dc.DrawText("PPSSPP", bounds.x + 42.0f, bounds.y + 20.0f, 0xDDFFFFFF, ALIGN_VCENTER);
 
 	// Top Right Clock & Date
 	time_t rawtime;
@@ -299,19 +342,19 @@ void XMBView::DrawStatusBar(UIContext &dc, const Bounds &bounds) {
 
 	float rightX = bounds.x2() - 24.0f;
 	dc.SetFontStyle(dc.GetTheme().uiFont);
-	dc.DrawText(timeBuf, rightX, bounds.y + 22.0f, 0xFFFFFFFF, ALIGN_RIGHT | ALIGN_VCENTER);
+	dc.DrawText(timeBuf, rightX, bounds.y + 20.0f, 0xFFFFFFFF, ALIGN_RIGHT | ALIGN_VCENTER);
 	float tw, th;
 	dc.MeasureText(dc.GetFontStyle(), 1.0f, 1.0f, timeBuf, &tw, &th);
 
 	dc.SetFontStyle(dc.GetTheme().uiFontSmall);
-	dc.DrawText(dateBuf, rightX - tw - 16.0f, bounds.y + 22.0f, 0xAAFFFFFF, ALIGN_RIGHT | ALIGN_VCENTER);
+	dc.DrawText(dateBuf, rightX - tw - 16.0f, bounds.y + 20.0f, 0xAAFFFFFF, ALIGN_RIGHT | ALIGN_VCENTER);
 	float dw, dh;
 	dc.MeasureText(dc.GetFontStyle(), 1.0f, 1.0f, dateBuf, &dw, &dh);
 
 	int battery = System_GetPropertyInt(SYSPROP_BATTERY_PERCENTAGE);
 	if (battery >= 0) {
 		std::string batStr = StringFromFormat("%d%%", battery);
-		dc.DrawText(batStr, rightX - tw - dw - 32.0f, bounds.y + 22.0f, 0xAAFFFFFF, ALIGN_RIGHT | ALIGN_VCENTER);
+		dc.DrawText(batStr, rightX - tw - dw - 32.0f, bounds.y + 20.0f, 0xAAFFFFFF, ALIGN_RIGHT | ALIGN_VCENTER);
 	}
 	dc.SetFontStyle(dc.GetTheme().uiFont);
 }
@@ -330,11 +373,8 @@ void XMBView::DrawCategoryBar(UIContext &dc, const Bounds &bounds, float anchorX
 		}
 
 		if ((int)i == selectedCategory_) {
-			// Selected category: Bold, prominent, bright white, category title above
-			dc.Draw()->DrawImage(cat.icon, cx, catY, 1.35f, 0xFFFFFFFF, ALIGN_CENTER);
-
-			dc.SetFontStyle(dc.GetTheme().uiFont);
-			dc.DrawTextShadow(cat.title, cx, catY - 32.0f, 0xFFFFFFFF, ALIGN_HCENTER);
+			// Selected category: Bold, prominent, bright white (text hidden per request)
+			dc.Draw()->DrawImage(cat.icon, cx, catY, 1.4f, 0xFFFFFFFF, ALIGN_CENTER);
 		} else {
 			// Inactive categories: Smaller, dimmed icons along the horizontal axis
 			dc.Draw()->DrawImage(cat.icon, cx, catY, 0.85f, colorAlpha(0xFFFFFFFF, 0.40f), ALIGN_CENTER);
@@ -354,8 +394,9 @@ void XMBView::DrawVerticalMenu(UIContext &dc, const Bounds &bounds, float anchor
 		return;
 	}
 
-	const float focusY = catY + 70.0f;
-	const float itemSpacing = 48.0f;
+	const float em = 24.0f;
+	const float focusY = catY + 68.0f;
+	const float itemSpacing = 54.0f;
 
 	dc.PushScissor(bounds);
 
@@ -378,40 +419,24 @@ void XMBView::DrawVerticalMenu(UIContext &dc, const Bounds &bounds, float anchor
 					float tw = (float)texture->Width();
 					float th = (float)texture->Height();
 					float h = 24.0f;
-					float w = th > 0 ? (h * tw / th) : 42.0f;
-					w = std::min(w, 52.0f);
+					float w = th > 0 ? (h * tw / th) : 40.0f;
+					w = std::min(w, 50.0f);
 
 					dc.Draw()->Flush();
 					dc.GetDrawContext()->BindTexture(0, texture);
-					dc.Draw()->DrawTexRect(anchorX - w * 0.5f, iy - h * 0.5f, anchorX + w * 0.5f, iy + h * 0.5f, 0.0f, 0.0f, 1.0f, 1.0f, colorAlpha(0xFFFFFFFF, 0.65f));
+					dc.Draw()->DrawTexRect(anchorX - w * 0.5f, iy - h * 0.5f, anchorX + w * 0.5f, iy + h * 0.5f, 0.0f, 0.0f, 1.0f, 1.0f, colorAlpha(0xFFFFFFFF, 0.60f));
 					dc.Draw()->Flush();
 					dc.RebindTexture();
 				} else {
 					ImageID fallback = item.icon.isValid() ? item.icon : ImageID("I_UMD");
-					dc.Draw()->DrawImage(fallback, anchorX, iy, 0.85f, colorAlpha(0xFFFFFFFF, 0.65f), ALIGN_CENTER);
+					dc.Draw()->DrawImage(fallback, anchorX, iy, 0.85f, colorAlpha(0xFFFFFFFF, 0.60f), ALIGN_CENTER);
 				}
 			} else {
 				ImageID iconID = item.icon.isValid() ? item.icon : ImageID("I_APP");
-				dc.Draw()->DrawImage(iconID, anchorX, iy, 0.85f, colorAlpha(0xFFFFFFFF, 0.65f), ALIGN_CENTER);
+				dc.Draw()->DrawImage(iconID, anchorX, iy, 0.85f, colorAlpha(0xFFFFFFFF, 0.60f), ALIGN_CENTER);
 			}
 		} else {
-			// Selected / highlighted: BOTH ICON AND TEXT ARE SHOWN! Plus glowing selection pill!
-			float pillW = std::min(bounds.w - (anchorX - 28.0f) - 30.0f, 440.0f);
-			Bounds hlBounds(anchorX - 28.0f, iy - 22.0f, pillW, 44.0f);
-
-			// Background highlight bar
-			dc.FillRect(UI::Drawable(0x35FFFFFF), hlBounds);
-
-			// Accent strip on left edge
-			Bounds accent(hlBounds.x, hlBounds.y, 3.5f, hlBounds.h);
-			dc.FillRect(UI::Drawable(0xFFFFFFFF), accent);
-
-			// Drop shadow
-			dc.Draw()->Flush();
-			dc.Draw()->DrawImage4Grid(dc.GetTheme().dropShadow4Grid, hlBounds.x - 3, hlBounds.y - 3, hlBounds.x2() + 3, hlBounds.y2() + 3, 0x40000000, 1.0f);
-			dc.Draw()->Flush();
-
-			// Selected item icon
+			// Selected / highlighted: 1.5x larger, 1em padding, NO background box!
 			std::string displayTitle = item.title;
 			std::string displaySubTitle = item.subTitle;
 
@@ -431,27 +456,28 @@ void XMBView::DrawVerticalMenu(UIContext &dc, const Bounds &bounds, float anchor
 					Draw::Texture *texture = ginfo->icon.texture;
 					float tw = (float)texture->Width();
 					float th = (float)texture->Height();
-					float h = 30.0f;
-					float w = th > 0 ? (h * tw / th) : 54.0f;
-					w = std::min(w, 64.0f);
+					float h = 36.0f; // 1.5x of 24.0f
+					float w = th > 0 ? (h * tw / th) : 60.0f;
+					w = std::min(w, 75.0f);
 
 					dc.Draw()->Flush();
-					dc.Draw()->DrawImage4Grid(dc.GetTheme().dropShadow4Grid, anchorX - w * 0.5f - 4, iy - h * 0.5f - 4, anchorX + w * 0.5f + 4, iy + h * 0.5f + 4, 0x60000000, 1.0f);
 					dc.GetDrawContext()->BindTexture(0, texture);
 					dc.Draw()->DrawTexRect(anchorX - w * 0.5f, iy - h * 0.5f, anchorX + w * 0.5f, iy + h * 0.5f, 0.0f, 0.0f, 1.0f, 1.0f, 0xFFFFFFFF);
 					dc.Draw()->Flush();
 					dc.RebindTexture();
 				} else {
 					ImageID fallback = item.icon.isValid() ? item.icon : ImageID("I_UMD");
-					dc.Draw()->DrawImage(fallback, anchorX, iy, 1.15f, 0xFFFFFFFF, ALIGN_CENTER);
+					dc.Draw()->DrawImage(fallback, anchorX, iy, 1.30f, 0xFFFFFFFF, ALIGN_CENTER); // 1.5x of 0.85f
 				}
 			} else {
 				ImageID iconID = item.icon.isValid() ? item.icon : ImageID("I_APP");
-				dc.Draw()->DrawImage(iconID, anchorX, iy, 1.15f, 0xFFFFFFFF, ALIGN_CENTER);
+				dc.Draw()->DrawImage(iconID, anchorX, iy, 1.30f, 0xFFFFFFFF, ALIGN_CENTER); // 1.5x of 0.85f
 			}
 
-			// Selected item text label (displayed to the right of the icon)
-			float textX = anchorX + 38.0f;
+			// Selected item text label with 1em padding
+			float iconHalfW = item.isGame ? 38.0f : 24.0f;
+			float textX = anchorX + iconHalfW + em; // 1em padding
+
 			dc.SetFontStyle(dc.GetTheme().uiFont);
 			dc.DrawTextShadow(displayTitle, textX, iy, 0xFFFFFFFF, ALIGN_VCENTER);
 
