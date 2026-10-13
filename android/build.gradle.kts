@@ -115,7 +115,7 @@ android {
 	}
 
 	defaultConfig {
-		applicationId = "org.ppsspp.ppsspp"
+		applicationId = "io.github.mininxd.ppsspp"
 		// Access the git version info via the extension
 		if (gitVersionName != "unknown") {
 			println("INFO: Overriding Android Version Name, Code: $gitVersionName $gitVersionCode")
@@ -190,7 +190,7 @@ android {
 	productFlavors {
 		create("normal") {
 			isDefault = true
-			applicationId = "org.ppsspp.ppsspp"
+			applicationId = "io.github.mininxd.ppsspp"
 			dimension = "variant"
 			externalNativeBuild {
 				cmake {
