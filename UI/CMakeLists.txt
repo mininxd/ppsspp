@@ -47,6 +47,8 @@ list(APPEND UISource
 	IAPScreen.h
 	MainScreen.h
 	MainScreen.cpp
+	XMBView.h
+	XMBView.cpp
 	GameBrowser.h
 	GameBrowser.cpp
 	MiscScreens.h

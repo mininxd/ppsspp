@@ -51,6 +51,13 @@
 #include "UI/InstallPkgScreen.h"
 #include "UI/Background.h"
 #include "UI/GameBrowser.h"
+#include "UI/XMBView.h"
+#include "UI/ControlMappingScreen.h"
+#include "UI/DeveloperToolsScreen.h"
+#include "UI/SystemInfoScreen.h"
+#include "UI/MemStickScreen.h"
+#include "UI/Store.h"
+#include "UI/MiscScreens.h"
 #include "Core/Config.h"
 #include "Core/Loaders.h"
 #include "Common/Data/Text/I18n.h"
@@ -142,6 +149,9 @@ static bool IsTempPath(const Path &str) {
 
 MainScreen::MainScreen() {
 	g_BackgroundAudio.SetGame(Path());
+	xmbPathBrowser_.SetPath(Path(g_Config.currentDirectory));
+	xmbHomebrewBrowser_.SetPath(GetSysDirectory(DIRECTORY_GAME));
+	xmbListingPending_ = true;
 }
 
 MainScreen::~MainScreen() {
@@ -350,163 +360,346 @@ void MainScreen::CreateMainButtons(UI::ViewGroup *parent, bool portrait) {
 	}
 }
 
-void MainScreen::CreateViews() {
-	// Information in the top left.
-	// Back button to the bottom left.
-	// Scrolling action menu to the right.
-	using namespace UI;
+void MainScreen::RefreshXMB() {
+	xmbPathBrowser_.Refresh();
+	xmbHomebrewBrowser_.Refresh();
+	xmbListingPending_ = true;
+	PopulateXMBCategories();
+}
 
-	const bool vertical = GetDeviceOrientation() == DeviceOrientation::Portrait;
+void MainScreen::PopulateXMBCategories() {
+	if (!xmbView_) {
+		return;
+	}
 
 	auto mm = GetI18NCategory(I18NCat::MAINMENU);
+	auto di = GetI18NCategory(I18NCat::DIALOG);
 
-	// Thie is the true root, leaves room for persistent notifications.
-	root_ = new LinearLayout(ORIENT_VERTICAL, new LinearLayoutParams(FILL_PARENT, FILL_PARENT));
+	std::vector<XMBCategory> categories;
 
-	tabHolder_ = new TabHolder(ORIENT_HORIZONTAL, 64, TabHolderFlags::Default, nullptr, nullptr, new LinearLayoutParams(FILL_PARENT, WRAP_CONTENT, 1.0f));
-	ViewGroup *leftColumn = tabHolder_;
-	tabHolder_->SetTag("MainScreenGames");
-	gameBrowsers_.clear();
+	// 1. Settings Category
+	{
+		XMBCategory cat;
+		cat.title = mm->T("Settings", "Settings");
+		cat.icon = ImageID("I_GEAR");
 
-	tabHolder_->SetClip(true);
+		XMBItem settingsItem;
+		settingsItem.title = mm->T("Game Settings", "Settings");
+		settingsItem.icon = ImageID("I_GEAR");
+		settingsItem.onSelect = [this]() {
+			screenManager()->push(new GameSettingsScreen(Path()));
+		};
+		cat.items.push_back(settingsItem);
 
-	bool showRecent = g_Config.iMaxRecent > 0;
-	bool hasStorageAccess = !System_GetPropertyBool(SYSPROP_SUPPORTS_PERMISSIONS) ||
-		System_GetPermissionStatus(SYSTEM_PERMISSION_STORAGE) == PERMISSION_STATUS_GRANTED;
-	bool storageIsTemporary = IsTempPath(GetSysDirectory(DIRECTORY_SAVEDATA)) && !confirmedTemporary_;
-	if (showRecent && !hasStorageAccess) {
-		showRecent = g_recentFiles.HasAny();
+		XMBItem controlsItem;
+		controlsItem.title = mm->T("Controls", "Control Mapping");
+		controlsItem.icon = ImageID("I_CONTROLLER");
+		controlsItem.onSelect = [this]() {
+			screenManager()->push(new ControlMappingScreen());
+		};
+		cat.items.push_back(controlsItem);
+
+		XMBItem displayItem;
+		displayItem.title = mm->T("Display Layout", "Display layout & effects");
+		displayItem.icon = ImageID("I_PSP_DISPLAY");
+		displayItem.onSelect = [this]() {
+			screenManager()->push(new DisplayLayoutScreen());
+		};
+		cat.items.push_back(displayItem);
+
+		XMBItem devToolsItem;
+		devToolsItem.title = mm->T("Developer Tools", "Developer Tools");
+		devToolsItem.icon = ImageID("I_TOOLS");
+		devToolsItem.onSelect = [this]() {
+			screenManager()->push(new DeveloperToolsScreen());
+		};
+		cat.items.push_back(devToolsItem);
+
+		XMBItem sysInfoItem;
+		sysInfoItem.title = mm->T("System Information", "System Info");
+		sysInfoItem.icon = ImageID("I_INFO");
+		sysInfoItem.onSelect = [this]() {
+			screenManager()->push(new SystemInfoScreen());
+		};
+		cat.items.push_back(sysInfoItem);
+
+		XMBItem memStickItem;
+		memStickItem.title = mm->T("Memory Stick", "Memory Stick");
+		memStickItem.icon = ImageID("I_SDCARD");
+		memStickItem.onSelect = [this]() {
+			screenManager()->push(new MemStickScreen());
+		};
+		cat.items.push_back(memStickItem);
+
+		categories.push_back(cat);
 	}
 
-	if (showRecent) {
-		CreateRecentTab();
+	// 2. Games Category
+	{
+		XMBCategory cat;
+		cat.title = mm->T("Games", "Games");
+		cat.icon = ImageID("I_UMD");
+
+		if (System_GetPropertyBool(SYSPROP_HAS_FILE_BROWSER)) {
+			XMBItem loadItem;
+			loadItem.title = mm->T("Load", "Load...");
+			loadItem.icon = ImageID("I_FOLDER_OPEN");
+			loadItem.onSelect = [this]() {
+				UI::EventParams e{};
+				OnLoadFile(e);
+			};
+			cat.items.push_back(loadItem);
+		}
+
+		if (System_GetPropertyBool(SYSPROP_HAS_FOLDER_BROWSER)) {
+			XMBItem browseItem;
+			browseItem.title = mm->T("Browse", "Browse Folder...");
+			browseItem.icon = ImageID("I_FOLDER");
+			browseItem.onSelect = [this]() {
+				auto mm = GetI18NCategory(I18NCat::MAINMENU);
+				System_BrowseForFolder(GetRequesterToken(), mm->T("Choose folder"), Path(g_Config.currentDirectory), [this](std::string_view filename, int) {
+					g_Config.currentDirectory = Path(filename);
+					xmbPathBrowser_.SetPath(Path(g_Config.currentDirectory));
+					RefreshXMB();
+				});
+			};
+			cat.items.push_back(browseItem);
+		}
+
+		if (xmbPathBrowser_.CanNavigateUp()) {
+			XMBItem upItem;
+			upItem.title = ".. (" + di->T("Up") + ")";
+			upItem.icon = ImageID("I_UP_DIRECTORY");
+			upItem.onSelect = [this]() {
+				xmbPathBrowser_.NavigateUp();
+				g_Config.currentDirectory = xmbPathBrowser_.GetPath();
+				RefreshXMB();
+			};
+			cat.items.push_back(upItem);
+		}
+
+		std::vector<File::FileInfo> fileInfo;
+		xmbPathBrowser_.GetListing(fileInfo, "iso:cso:chd:pbp:elf:prx:ppdmp:zip:7z:pkg:");
+
+		// Subfolders first
+		for (const auto &fi : fileInfo) {
+			if (fi.isDirectory && fi.name != "." && fi.name != "..") {
+				XMBItem dirItem;
+				dirItem.title = fi.name;
+				dirItem.icon = ImageID("I_FOLDER");
+				dirItem.onSelect = [this, name = fi.name]() {
+					xmbPathBrowser_.Navigate(name);
+					g_Config.currentDirectory = xmbPathBrowser_.GetPath();
+					RefreshXMB();
+				};
+				cat.items.push_back(dirItem);
+			}
+		}
+
+		// Games
+		for (const auto &fi : fileInfo) {
+			if (!fi.isDirectory) {
+				XMBItem gameItem;
+				gameItem.isGame = true;
+				gameItem.gamePath = fi.fullName;
+				gameItem.title = fi.name;
+				gameItem.icon = ImageID("I_UMD");
+				gameItem.onSelect = [this, path = fi.fullName]() {
+					LaunchFile(screenManager(), this, path);
+				};
+				gameItem.onHold = [this, path = fi.fullName]() {
+					restoreFocusGamePath_ = highlightedGamePath_;
+					g_BackgroundAudio.SetGame(path);
+					lockBackgroundAudio_ = true;
+					screenManager()->push(new GameScreen(path, false));
+				};
+				cat.items.push_back(gameItem);
+			}
+		}
+
+		categories.push_back(cat);
 	}
 
-	Button *focusButton = nullptr;
-	if (hasStorageAccess) {
-		CreateBrowserTab(Path(g_Config.currentDirectory), "Games", "How to get games", getGamesUri, BrowseFlags::STANDARD, &g_Config.bGridView2, &g_Config.fGameListScrollPosition);
-		CreateBrowserTab(GetSysDirectory(DIRECTORY_GAME), "Homebrew & Demos", "How to get homebrew & demos", getHomebrewUri, BrowseFlags::HOMEBREW_STORE, &g_Config.bGridView3, &g_Config.fHomebrewScrollPosition);
+	// 3. Recent Category
+	{
+		XMBCategory cat;
+		cat.title = mm->T("Recent", "Recent");
+		cat.icon = ImageID("I_GRID");
 
-		if (g_Config.bRemoteTab && !g_Config.sLastRemoteISOServer.empty()) {
-			Path remotePath(FormatRemoteISOUrl(g_Config.sLastRemoteISOServer.c_str(), g_Config.iLastRemoteISOPort, RemoteSubdir().c_str()));
-			GameBrowser *remoteBrowser = CreateBrowserTab(remotePath, "Remote disc streaming", "Remote disc streaming", remoteGamesUri, BrowseFlags::NAVIGATE, &g_Config.bGridView4, &g_Config.fRemoteScrollPosition);
-			remoteBrowser->SetHomePath(remotePath);
+		for (const auto &str : g_recentFiles.GetRecentFiles()) {
+			Path p(str);
+			XMBItem gameItem;
+			gameItem.isGame = true;
+			gameItem.gamePath = p;
+			gameItem.title = p.GetFilename();
+			gameItem.icon = ImageID("I_UMD");
+			gameItem.onSelect = [this, p]() {
+				LaunchFile(screenManager(), this, p);
+			};
+			gameItem.onHold = [this, p]() {
+				restoreFocusGamePath_ = highlightedGamePath_;
+				g_BackgroundAudio.SetGame(p);
+				lockBackgroundAudio_ = true;
+				screenManager()->push(new GameScreen(p, false));
+			};
+			cat.items.push_back(gameItem);
 		}
 
 		if (g_recentFiles.HasAny()) {
-			tabHolder_->SetCurrentTab(std::clamp(g_Config.iDefaultTab, 0, g_Config.bRemoteTab ? 3 : 2), true);
-		} else if (g_Config.iMaxRecent > 0) {
-			tabHolder_->SetCurrentTab(1, true);	
+			XMBItem clearItem;
+			clearItem.title = mm->T("Clear Recent", "Clear Recent");
+			clearItem.icon = ImageID("I_TRASHCAN");
+			clearItem.onSelect = [this]() {
+				g_recentFiles.Clear();
+				RefreshXMB();
+			};
+			cat.items.push_back(clearItem);
+		} else {
+			XMBItem emptyItem;
+			emptyItem.title = mm->T("No games found", "No games found");
+			emptyItem.icon = ImageID("I_INFO");
+			cat.items.push_back(emptyItem);
 		}
 
-		if (backFromStore_ || showHomebrewTab) {
-			tabHolder_->SetCurrentTab(2, true);
-			backFromStore_ = false;
-			showHomebrewTab = false;
-		}
-
-		if (storageIsTemporary) {
-			LinearLayout *buttonHolder = new LinearLayout(ORIENT_HORIZONTAL, new LinearLayoutParams(WRAP_CONTENT, WRAP_CONTENT));
-			buttonHolder->Add(new Spacer(new LinearLayoutParams(1.0f)));
-			focusButton = new Button(mm->T("SavesAreTemporaryIgnore", "Ignore warning"), new LinearLayoutParams(WRAP_CONTENT, WRAP_CONTENT));
-			focusButton->SetPadding(32, 16);
-			buttonHolder->Add(focusButton)->OnClick.Add([this](UI::EventParams &e) {
-				confirmedTemporary_ = true;
-				RecreateViews();
-			});
-			buttonHolder->Add(new Spacer(new LinearLayoutParams(1.0f)));
-
-			leftColumn->Add(new Spacer(new LinearLayoutParams(0.1f)));
-			leftColumn->Add(new TextView(mm->T("SavesAreTemporary", "PPSSPP saving in temporary storage"), ALIGN_HCENTER, false));
-			leftColumn->Add(new TextView(mm->T("SavesAreTemporaryGuidance", "Extract PPSSPP somewhere to save permanently"), ALIGN_HCENTER, false));
-			leftColumn->Add(new Spacer(10.0f));
-			leftColumn->Add(buttonHolder);
-			leftColumn->Add(new Spacer(new LinearLayoutParams(0.1f)));
-		}
-	} else {
-		if (!showRecent) {
-			leftColumn = new LinearLayout(ORIENT_VERTICAL, new LinearLayoutParams(FILL_PARENT, WRAP_CONTENT, 1.0f));
-			// Just so it's destroyed on recreate.
-			leftColumn->Add(tabHolder_);
-			tabHolder_->SetVisibility(V_GONE);
-		}
-
-		LinearLayout *buttonHolder = new LinearLayout(ORIENT_HORIZONTAL, new LinearLayoutParams(WRAP_CONTENT, WRAP_CONTENT));
-		buttonHolder->Add(new Spacer(new LinearLayoutParams(1.0f)));
-		focusButton = new Button(mm->T("Give PPSSPP permission to access storage"), new LinearLayoutParams(WRAP_CONTENT, WRAP_CONTENT));
-		focusButton->SetPadding(32, 16);
-		buttonHolder->Add(focusButton)->OnClick.Handle(this, &MainScreen::OnAllowStorage);
-		buttonHolder->Add(new Spacer(new LinearLayoutParams(1.0f)));
-
-		leftColumn->Add(new Spacer(new LinearLayoutParams(0.1f)));
-		leftColumn->Add(buttonHolder);
-		leftColumn->Add(new Spacer(10.0f));
-		leftColumn->Add(new TextView(mm->T("PPSSPP can't load games or save right now"), ALIGN_HCENTER, false));
-		leftColumn->Add(new Spacer(new LinearLayoutParams(0.1f)));
+		categories.push_back(cat);
 	}
 
-	if (vertical) {
-		LinearLayout *header = new LinearLayout(ORIENT_HORIZONTAL, new LinearLayoutParams(FILL_PARENT, WRAP_CONTENT, Margins(8, 8, 8, 16)));
-		header->SetSpacing(5.0f);
-		header->Add(new LogoView(true, new LinearLayoutParams(1.0f)));
+	// 4. Homebrew & Demos Category
+	{
+		XMBCategory cat;
+		cat.title = mm->T("Homebrew & Demos", "Homebrew & Demos");
+		cat.icon = ImageID("I_HOMEBREW_STORE");
 
-		LinearLayout *buttonGroup = new LinearLayout(ORIENT_HORIZONTAL, new LinearLayoutParams(WRAP_CONTENT, WRAP_CONTENT, 1.0f, UI::Gravity::G_VCENTER));
+		XMBItem storeItem;
+		storeItem.title = mm->T("Download from the PPSSPP Homebrew Store", "PPSSPP Homebrew Store");
+		storeItem.icon = ImageID("I_HOMEBREW_STORE");
+		storeItem.onSelect = [this]() {
+			screenManager()->push(new StoreScreen());
+		};
+		cat.items.push_back(storeItem);
 
-		CreateMainButtons(buttonGroup, vertical);
-		header->Add(buttonGroup);
-
-		LinearLayout *rootLayout = new LinearLayout(ORIENT_VERTICAL, new LinearLayoutParams(1.0f));
-		rootLayout->SetSpacing(0.0f);
-
-		leftColumn->ReplaceLayoutParams(new LinearLayoutParams(1.0f));
-		rootLayout->Add(header);
-		rootLayout->Add(leftColumn);
-		root_->Add(rootLayout);
-
-		// no space for a fullscreen button!
-	} else {
-		const Margins actionMenuMargins(0, 10, 10, 0);
-		ViewGroup *rightColumn = new ScrollView(ORIENT_VERTICAL, new LinearLayoutParams(320, FILL_PARENT, actionMenuMargins));
-		LinearLayout *rightColumnItems = new LinearLayout(ORIENT_VERTICAL, new LinearLayoutParams(FILL_PARENT, WRAP_CONTENT));
-		rightColumnItems->SetSpacing(0.0f);
-		ViewGroup *logo = new LogoView(false, new LinearLayoutParams(FILL_PARENT, 80.0f));
-
-		if (System_GetPropertyInt(SYSPROP_DEVICE_TYPE) == DEVICE_TYPE_DESKTOP) {
-			auto gr = GetI18NCategory(I18NCat::GRAPHICS);
-			Button *fullscreenButton = logo->Add(new Button("", ImageID(), new AnchorLayoutParams(48, 48, NONE, 0, 0, NONE, Centering::None)));
-			fullscreenButton->SetIgnoreText(true);
-			fullscreenButton->OnClick.Add([](UI::EventParams &e) {
-				g_Config.bFullScreen = !g_Config.bFullScreen;
-				System_ApplyFullscreenState();
-			});
-			fullscreenButton->SetImageIDFunc([]() {
-				return g_Config.bFullScreen ? ImageID("I_RESTORE") : ImageID("I_FULLSCREEN");
-			});
+		std::vector<File::FileInfo> homebrewInfo;
+		xmbHomebrewBrowser_.GetListing(homebrewInfo, "iso:cso:chd:pbp:elf:prx:ppdmp:zip:7z:pkg:");
+		for (const auto &fi : homebrewInfo) {
+			XMBItem hbItem;
+			hbItem.isGame = true;
+			hbItem.gamePath = fi.fullName;
+			hbItem.title = fi.name;
+			hbItem.icon = ImageID("I_APP");
+			hbItem.onSelect = [this, path = fi.fullName]() {
+				LaunchFile(screenManager(), this, path);
+			};
+			hbItem.onHold = [this, path = fi.fullName]() {
+				restoreFocusGamePath_ = highlightedGamePath_;
+				g_BackgroundAudio.SetGame(path);
+				lockBackgroundAudio_ = true;
+				screenManager()->push(new GameScreen(path, false));
+			};
+			cat.items.push_back(hbItem);
 		}
-		rightColumnItems->Add(logo);
 
-		LinearLayout *rightColumnChoices = rightColumnItems;
-		CreateMainButtons(rightColumnChoices, vertical);
-
-		rightColumn->Add(rightColumnItems);
-
-		LinearLayout *columns = new LinearLayout(ORIENT_HORIZONTAL, new LinearLayoutParams(1.0f));
-		columns->Add(leftColumn);
-		columns->Add(rightColumn);
-		root_->Add(columns);
+		categories.push_back(cat);
 	}
 
-	if (focusButton) {
-		root_->SetDefaultFocusView(focusButton);
-	} else if (tabHolder_->GetVisibility() != V_GONE) {
-		root_->SetDefaultFocusView(tabHolder_);
+	// 5. Network Category
+	{
+		XMBCategory cat;
+		cat.title = mm->T("Network", "Network");
+		cat.icon = ImageID("I_WIFI");
+
+		XMBItem remoteItem;
+		remoteItem.title = mm->T("Remote disc streaming", "Remote disc streaming");
+		remoteItem.icon = ImageID("I_WIFI");
+		remoteItem.onSelect = [this]() {
+			screenManager()->push(new RemoteISOConnectScreen());
+		};
+		cat.items.push_back(remoteItem);
+
+		XMBItem webItem;
+		webItem.title = mm->T("www.ppsspp.org", "www.ppsspp.org");
+		webItem.icon = ImageID("I_LINK_OUT");
+		webItem.onSelect = [this]() {
+			UI::EventParams e{};
+			OnPPSSPPOrg(e);
+		};
+		cat.items.push_back(webItem);
+
+		XMBItem forumsItem;
+		forumsItem.title = mm->T("Community Forums", "Community Forums");
+		forumsItem.icon = ImageID("I_CHAT");
+		forumsItem.onSelect = [this]() {
+			UI::EventParams e{};
+			OnForums(e);
+		};
+		cat.items.push_back(forumsItem);
+
+		XMBItem discordItem;
+		discordItem.title = mm->T("Discord", "Discord");
+		discordItem.icon = ImageID("I_LOGO_DISCORD");
+		discordItem.onSelect = []() {
+			System_LaunchUrl(LaunchUrlType::BROWSER_URL, "https://discord.gg/5NJB6dD");
+		};
+		cat.items.push_back(discordItem);
+
+		categories.push_back(cat);
 	}
 
+	// 6. System / Power Category
+	{
+		XMBCategory cat;
+		cat.title = mm->T("System", "System");
+		cat.icon = ImageID("I_INFO");
+
+		if (!System_GetPropertyBool(SYSPROP_APP_GOLD) && (System_GetPropertyInt(SYSPROP_DEVICE_TYPE) != DEVICE_TYPE_VR)) {
+			XMBItem goldItem;
+			goldItem.title = mm->T("Buy PPSSPP Gold", "Buy PPSSPP Gold");
+			goldItem.icon = ImageID("I_ICON_GOLD");
+			goldItem.onSelect = [this]() {
+				LaunchBuyGold(this->screenManager());
+			};
+			cat.items.push_back(goldItem);
+		}
+
+		XMBItem creditsItem;
+		creditsItem.title = mm->T("About PPSSPP", "About PPSSPP");
+		creditsItem.icon = ImageID("I_INFO");
+		creditsItem.onSelect = [this]() {
+			UI::EventParams e{};
+			OnCredits(e);
+		};
+		cat.items.push_back(creditsItem);
+
+		XMBItem exitItem;
+		exitItem.title = di->T("Exit", "Exit");
+		exitItem.icon = ImageID("I_EXIT");
+		exitItem.onSelect = []() {
+			if (!g_Config.Save("MainScreen::OnExit")) {
+				System_Toast("Failed to save settings!\nCheck permissions, or try to restart the device.");
+			}
+			UpdateUIState(UISTATE_EXIT);
+			System_ExitApp();
+		};
+		cat.items.push_back(exitItem);
+
+		categories.push_back(cat);
+	}
+
+	int prevCat = xmbView_->GetSelectedCategory();
+	xmbView_->SetCategories(std::move(categories));
+	if (prevCat >= 0) {
+		xmbView_->SetSelectedCategory(prevCat);
+	}
+}
+
+void MainScreen::CreateViews() {
+	using namespace UI;
+
+	root_ = new LinearLayout(ORIENT_VERTICAL, new LinearLayoutParams(FILL_PARENT, FILL_PARENT));
 	root_->SetTag("mainroot");
 
 	const UI::Drawable dismissableBackground = screenManager()->getUIContext()->GetTheme().itemDownStyle.background;
 
-	auto CreateDismissableBar = [this, vertical, dismissableBackground](std::string_view message, std::string_view action, std::function<void()> onDismiss) {
+	auto CreateDismissableBar = [this, dismissableBackground](std::string_view message, std::string_view action, std::function<void()> onDismiss) {
 		Margins margins(0, 0);
 		UI::LinearLayout *bar = new LinearLayout(ORIENT_HORIZONTAL, new LinearLayoutParams(FILL_PARENT, WRAP_CONTENT, margins));
 
@@ -532,15 +725,12 @@ void MainScreen::CreateViews() {
 	if (!g_Config.sUpgradeMessage.empty()) {
 		auto di = GetI18NCategory(I18NCat::DIALOG);
 		std::string upgradeMessage(di->T("New version of PPSSPP available"));
-		// The version only really fits in the horizontal layout.
 		upgradeMessage += ": " + g_Config.sUpgradeVersion;
 		UI::LinearLayout *upgradeBar = CreateDismissableBar(upgradeMessage, di->T("Download"), [this]() {
 			g_Config.DismissUpgrade();
 			g_Config.Save("dismissupgrade");
 		});
-
-		// Slip in at the top.
-		root_->Insert(0, upgradeBar);
+		root_->Add(upgradeBar);
 	}
 
 #if PPSSPP_PLATFORM(WINDOWS) && PPSSPP_ARCH(X86)
@@ -551,13 +741,53 @@ void MainScreen::CreateViews() {
 			g_Config.bWow64WarningDismissed = true;
 			g_Config.Save("dismisswow64");
 		});
-		root_->Insert(0, upgradeBar);
+		root_->Add(upgradeBar);
 	}
 #endif
+
+	xmbView_ = new XMBView(new LinearLayoutParams(FILL_PARENT, FILL_PARENT, 1.0f));
+	xmbView_->onHighlightGame = [this](const Path &path) {
+		InstantHighlight(path);
+		highlightedGamePath_ = path;
+		if (!lockBackgroundAudio_) {
+			g_BackgroundAudio.SetGame(path);
+		}
+	};
+	xmbView_->onClearHighlight = [this]() {
+		highlightedBackgrounds_.clear();
+		highlightedGamePath_.clear();
+		g_BackgroundAudio.SetGame(Path());
+	};
+
+	PopulateXMBCategories();
+
+	if (showHomebrewTab || backFromStore_) {
+		xmbView_->SetSelectedCategory(3); // Homebrew & Demos
+		showHomebrewTab = false;
+		backFromStore_ = false;
+	} else if (g_recentFiles.HasAny()) {
+		int defCat = std::clamp(g_Config.iDefaultTab, 0, 3);
+		int catIndex = 1;
+		if (defCat == 0) catIndex = 2; // Recent
+		else if (defCat == 1) catIndex = 1; // Games
+		else if (defCat == 2) catIndex = 3; // Homebrew
+		xmbView_->SetSelectedCategory(catIndex);
+	} else {
+		xmbView_->SetSelectedCategory(1); // Games
+	}
+
+	root_->Add(xmbView_);
+	root_->SetDefaultFocusView(xmbView_);
 }
 
 bool MainScreen::key(const KeyInput &key) {
 	if (key.flags & KeyInputFlags::DOWN) {
+		if (UI::IsEscapeKey(key) && xmbView_ && xmbView_->GetSelectedCategory() == 1 && xmbPathBrowser_.CanNavigateUp()) {
+			xmbPathBrowser_.NavigateUp();
+			g_Config.currentDirectory = xmbPathBrowser_.GetPath();
+			RefreshXMB();
+			return true;
+		}
 		if (key.keyCode == NKCODE_F && (key.flags & KeyInputFlags::ModCtrl) && System_GetPropertyBool(SYSPROP_HAS_TEXT_INPUT_DIALOG)) {
 			auto se = GetI18NCategory(I18NCat::SEARCH);
 			System_InputBoxGetString(GetRequesterToken(), se->T("Search term"), searchFilter_, false, [this](std::string_view value, int) {
@@ -616,8 +846,10 @@ void MainScreen::sendMessage(UIMessage message, const char *value) {
 	if (message == UIMessage::REQUEST_GAME_BOOT) {
 		LaunchFile(screenManager(), this, Path(value));
 	} else if (message == UIMessage::PERMISSION_GRANTED && !strcmp(value, "storage")) {
+		RefreshXMB();
 		RecreateViews();
 	} else if (message == UIMessage::RECENT_FILES_CHANGED) {
+		RefreshXMB();
 		RecreateViews();
 	}
 }
@@ -625,6 +857,13 @@ void MainScreen::sendMessage(UIMessage message, const char *value) {
 void MainScreen::update() {
 	UIScreen::update();
 	UpdateUIState(UISTATE_MENU);
+
+	if (xmbListingPending_) {
+		if (xmbPathBrowser_.IsListingReady() || xmbHomebrewBrowser_.IsListingReady()) {
+			PopulateXMBCategories();
+			xmbListingPending_ = false;
+		}
+	}
 
 	if (searchChanged_) {
 		for (auto browser : gameBrowsers_) {
@@ -801,6 +1040,7 @@ void MainScreen::dialogFinished(const Screen *dialog, DialogResult result) {
 			// Deleted or removed from recents. The recents tab recreates itself on RECENT_FILES_CHANGED.
 			restoreFocusGamePath_.clear();
 			g_BackgroundAudio.SetGame(Path());
+			RefreshXMB();
 			for (auto browser : gameBrowsers_) {
 				browser->RequestRefresh();
 			}
@@ -808,10 +1048,12 @@ void MainScreen::dialogFinished(const Screen *dialog, DialogResult result) {
 			// Prevent the background from fading, since we just were displaying it.
 			InstantHighlight(restoreFocusGamePath_);
 
-			// Refocus the game button itself.
-			int tab = tabHolder_->GetCurrentTab();
-			if (tab >= 0 && tab < (int)gameBrowsers_.size()) {
-				gameBrowsers_[tab]->FocusGame(restoreFocusGamePath_);
+			// Refocus the game button itself if tabHolder_ exists.
+			if (tabHolder_) {
+				int tab = tabHolder_->GetCurrentTab();
+				if (tab >= 0 && tab < (int)gameBrowsers_.size()) {
+					gameBrowsers_[tab]->FocusGame(restoreFocusGamePath_);
+				}
 			}
 
 			// Don't get confused next time.

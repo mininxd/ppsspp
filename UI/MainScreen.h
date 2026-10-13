@@ -29,6 +29,7 @@
 #include "Common/File/PathBrowser.h"
 
 #include "UI/GameBrowser.h"
+#include "UI/XMBView.h"
 
 class RemoteISOBrowseScreen;
 
@@ -81,6 +82,7 @@ protected:
 	void OnAllowStorage(UI::EventParams &e);
 
 	UI::TabHolder *tabHolder_ = nullptr;
+	XMBView *xmbView_ = nullptr;
 
 	Path restoreFocusGamePath_;
 	std::vector<GameBrowser *> gameBrowsers_;
@@ -94,6 +96,13 @@ protected:
 	bool confirmedTemporary_ = false;
 	bool searchChanged_ = false;
 	std::string searchFilter_;
+
+	PathBrowser xmbPathBrowser_;
+	PathBrowser xmbHomebrewBrowser_;
+	bool xmbListingPending_ = false;
+
+	void PopulateXMBCategories();
+	void RefreshXMB();
 
 	friend class RemoteISOBrowseScreen;
 private:

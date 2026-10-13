@@ -127,6 +127,7 @@
     <ClInclude Include="..\..\UI\RetroAchievementScreens.h" />
     <ClInclude Include="..\..\UI\Theme.h" />
     <ClInclude Include="..\..\UI\MainScreen.h" />
+    <ClInclude Include="..\..\UI\XMBView.h" />
     <ClInclude Include="..\..\UI\MemStickScreen.h" />
     <ClInclude Include="..\..\UI\MiscScreens.h" />
     <ClInclude Include="..\..\UI\IAPScreen.h" />
@@ -190,6 +191,7 @@
     <ClCompile Include="..\..\UI\RetroAchievementScreens.cpp" />
     <ClCompile Include="..\..\UI\Theme.cpp" />
     <ClCompile Include="..\..\UI\MainScreen.cpp" />
+    <ClCompile Include="..\..\UI\XMBView.cpp" />
     <ClCompile Include="..\..\UI\MemStickScreen.cpp" />
     <ClCompile Include="..\..\UI\MiscScreens.cpp" />
     <ClCompile Include="..\..\UI\IAPScreen.cpp" />
