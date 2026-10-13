@@ -58,7 +58,7 @@ void XMBView::SetSelectedCategory(int catIndex) {
 	}
 	selectedCategory_ = std::clamp(catIndex, 0, (int)categories_.size() - 1);
 	UpdateHighlight();
-	PlayUISound(UISound::SELECT);
+	UI::PlayUISound(UI::UISound::SELECT);
 }
 
 int XMBView::GetSelectedItem() const {
@@ -86,7 +86,7 @@ void XMBView::ChangeCategory(int delta) {
 	int count = (int)categories_.size();
 	selectedCategory_ = (selectedCategory_ + delta + count) % count;
 	UpdateHighlight();
-	PlayUISound(UISound::SELECT);
+	UI::PlayUISound(UI::UISound::SELECT);
 }
 
 void XMBView::ChangeItem(int delta) {
@@ -101,14 +101,14 @@ void XMBView::ChangeItem(int delta) {
 	if (newItem != cat.selectedItem) {
 		cat.selectedItem = newItem;
 		UpdateHighlight();
-		PlayUISound(UISound::SELECT);
+		UI::PlayUISound(UI::UISound::SELECT);
 	}
 }
 
 void XMBView::TriggerSelect() {
 	const XMBItem *item = GetActiveItem();
 	if (item && item->onSelect) {
-		PlayUISound(UISound::CONFIRM);
+		UI::PlayUISound(UI::UISound::CONFIRM);
 		item->onSelect();
 	}
 }
@@ -116,7 +116,7 @@ void XMBView::TriggerSelect() {
 void XMBView::TriggerHold() {
 	const XMBItem *item = GetActiveItem();
 	if (item && item->onHold) {
-		PlayUISound(UISound::SELECT);
+		UI::PlayUISound(UI::UISound::SELECT);
 		item->onHold();
 	}
 }
@@ -243,7 +243,7 @@ bool XMBView::Touch(const TouchInput &touch) {
 						} else {
 							cat.selectedItem = (int)j;
 							UpdateHighlight();
-							PlayUISound(UISound::SELECT);
+							UI::PlayUISound(UI::UISound::SELECT);
 						}
 						return true;
 					}
@@ -470,7 +470,6 @@ void XMBView::DrawVerticalMenu(UIContext &dc, const Bounds &bounds, float anchor
 
 void XMBView::DrawControlHints(UIContext &dc, const Bounds &bounds) {
 	auto di = GetI18NCategory(I18NCat::DIALOG);
-	auto mm = GetI18NCategory(I18NCat::MAINMENU);
 
 	float hintY = bounds.y2() - 20.0f;
 	float curX = bounds.x2() - 30.0f;
@@ -480,7 +479,7 @@ void XMBView::DrawControlHints(UIContext &dc, const Bounds &bounds) {
 	// Triangle: Options
 	const XMBItem *active = GetActiveItem();
 	if (active && active->onHold) {
-		std::string optText = di->T("Options", "Options");
+		std::string_view optText = di->T("Options", "Options");
 		float ow, oh;
 		dc.MeasureText(dc.GetFontStyle(), 1.0f, 1.0f, optText, &ow, &oh);
 		dc.DrawText(optText, curX, hintY, 0xCCFFFFFF, ALIGN_RIGHT | ALIGN_VCENTER);
@@ -490,7 +489,7 @@ void XMBView::DrawControlHints(UIContext &dc, const Bounds &bounds) {
 	}
 
 	// Cross: Enter
-	std::string enterText = di->T("Enter", "Enter");
+	std::string_view enterText = di->T("Enter", "Enter");
 	float ew, eh;
 	dc.MeasureText(dc.GetFontStyle(), 1.0f, 1.0f, enterText, &ew, &eh);
 	dc.DrawText(enterText, curX, hintY, 0xCCFFFFFF, ALIGN_RIGHT | ALIGN_VCENTER);

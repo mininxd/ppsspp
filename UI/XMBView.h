@@ -86,7 +86,6 @@ private:
 	float animCatPos_ = 0.0f;
 
 	bool isDragging_ = false;
-	float dragStartY_ = 0.0f;
 	float touchDownX_ = 0.0f;
 	float touchDownY_ = 0.0f;
 	double touchDownTime_ = 0.0;

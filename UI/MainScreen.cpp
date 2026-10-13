@@ -395,7 +395,7 @@ void MainScreen::PopulateXMBCategories() {
 		controlsItem.title = mm->T("Controls", "Control Mapping");
 		controlsItem.icon = ImageID("I_CONTROLLER");
 		controlsItem.onSelect = [this]() {
-			screenManager()->push(new ControlMappingScreen());
+			screenManager()->push(new ControlMappingScreen(Path()));
 		};
 		cat.items.push_back(controlsItem);
 
@@ -403,7 +403,7 @@ void MainScreen::PopulateXMBCategories() {
 		displayItem.title = mm->T("Display Layout", "Display layout & effects");
 		displayItem.icon = ImageID("I_PSP_DISPLAY");
 		displayItem.onSelect = [this]() {
-			screenManager()->push(new DisplayLayoutScreen());
+			screenManager()->push(new DisplayLayoutScreen(Path()));
 		};
 		cat.items.push_back(displayItem);
 
@@ -411,7 +411,7 @@ void MainScreen::PopulateXMBCategories() {
 		devToolsItem.title = mm->T("Developer Tools", "Developer Tools");
 		devToolsItem.icon = ImageID("I_TOOLS");
 		devToolsItem.onSelect = [this]() {
-			screenManager()->push(new DeveloperToolsScreen());
+			screenManager()->push(new DeveloperToolsScreen(Path()));
 		};
 		cat.items.push_back(devToolsItem);
 
@@ -419,7 +419,7 @@ void MainScreen::PopulateXMBCategories() {
 		sysInfoItem.title = mm->T("System Information", "System Info");
 		sysInfoItem.icon = ImageID("I_INFO");
 		sysInfoItem.onSelect = [this]() {
-			screenManager()->push(new SystemInfoScreen());
+			screenManager()->push(new SystemInfoScreen(Path()));
 		};
 		cat.items.push_back(sysInfoItem);
 
@@ -427,7 +427,7 @@ void MainScreen::PopulateXMBCategories() {
 		memStickItem.title = mm->T("Memory Stick", "Memory Stick");
 		memStickItem.icon = ImageID("I_SDCARD");
 		memStickItem.onSelect = [this]() {
-			screenManager()->push(new MemStickScreen());
+			screenManager()->push(new MemStickScreen(false));
 		};
 		cat.items.push_back(memStickItem);
 
@@ -468,7 +468,7 @@ void MainScreen::PopulateXMBCategories() {
 
 		if (xmbPathBrowser_.CanNavigateUp()) {
 			XMBItem upItem;
-			upItem.title = ".. (" + di->T("Up") + ")";
+			upItem.title = std::string(".. (").append(di->T("Up")).append(")");
 			upItem.icon = ImageID("I_UP_DIRECTORY");
 			upItem.onSelect = [this]() {
 				xmbPathBrowser_.NavigateUp();
@@ -726,7 +726,7 @@ void MainScreen::CreateViews() {
 		auto di = GetI18NCategory(I18NCat::DIALOG);
 		std::string upgradeMessage(di->T("New version of PPSSPP available"));
 		upgradeMessage += ": " + g_Config.sUpgradeVersion;
-		UI::LinearLayout *upgradeBar = CreateDismissableBar(upgradeMessage, di->T("Download"), [this]() {
+		UI::LinearLayout *upgradeBar = CreateDismissableBar(upgradeMessage, di->T("Download"), []() {
 			g_Config.DismissUpgrade();
 			g_Config.Save("dismissupgrade");
 		});
