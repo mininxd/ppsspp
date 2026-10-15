@@ -72,3 +72,7 @@
 [submodule "ext/oboe"]
 	path = ext/oboe
 	url = https://github.com/google/oboe.git
+[submodule "pcsx2"]
+	path = pcsx2
+	url = https://github.com/pcsx2/pcsx2.git
+
