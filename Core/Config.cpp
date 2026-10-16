@@ -1087,7 +1087,7 @@ static const ConfigSetting systemParamSettings[] = {
 	ConfigSetting("WlanPowerSave", SETTING(g_Config, bWlanPowerSave), (bool) PSP_SYSTEMPARAM_WLAN_POWERSAVE_OFF, CfgFlag::PER_GAME),
 	ConfigSetting("EncryptSave", SETTING(g_Config, bEncryptSave), true, CfgFlag::PER_GAME | CfgFlag::REPORT),
 	ConfigSetting("MemStickSize", SETTING(g_Config, iMemStickSizeGB), 16, CfgFlag::DEFAULT),
-	ConfigSetting("PS2BiosPath", SETTING(g_Config, ps2BiosPath), Path(), CfgFlag::DEFAULT),
+	ConfigSetting("PS2BiosPath", SETTING(g_Config, ps2BiosPath), "", CfgFlag::DEFAULT),
 	ConfigSetting("PS2BiosPromptShown", SETTING(g_Config, bPS2BiosPromptShown), false, CfgFlag::DEFAULT),
 	ConfigSetting("PS2GPUBackend", SETTING(g_Config, iPS2GPUBackend), 0, CfgFlag::DEFAULT),
 };
