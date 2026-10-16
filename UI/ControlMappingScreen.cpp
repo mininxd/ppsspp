@@ -224,6 +224,7 @@ static const BindingCategory cats[] = {
 	{"Control modifiers", VIRTKEY_ANALOG_ROTATE_CW},
 	{"Emulator controls", VIRTKEY_FASTFORWARD},
 	{"Extended PSP controls", VIRTKEY_AXIS_RIGHT_Y_MAX},
+	{"PlayStation 2 controls", CTRL_L2},
 	{},  // sentinel
 };
 

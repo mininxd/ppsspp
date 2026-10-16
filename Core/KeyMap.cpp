@@ -546,10 +546,10 @@ const KeyMap_IntStrPair psp_button_names[] = {
 	{CTRL_VOL_DOWN, "Vol -"},
 	{CTRL_SCREEN, "Screen"},
 	{CTRL_NOTE, "Note"},
-	{CTRL_L2, "Dev-kit L2"},
-	{CTRL_L3, "Dev-kit L3"},
-	{CTRL_R2, "Dev-kit R2"},
-	{CTRL_R3, "Dev-kit R3"},
+	{CTRL_L2, "L2 (for PS2)"},
+	{CTRL_R2, "R2 (for PS2)"},
+	{CTRL_L3, "L3 (for PS2)"},
+	{CTRL_R3, "R3 (for PS2)"},
 };
 
 // key here can be other things than InputKeyCode.
@@ -840,6 +840,12 @@ void LoadFromIni(IniFile &file) {
 	for (size_t i = 0; i < ARRAY_SIZE(psp_button_names); i++) {
 		std::string value;
 		controls->Get(psp_button_names[i].name, &value);
+		if (value.empty()) {
+			if (psp_button_names[i].key == CTRL_L2) controls->Get("Dev-kit L2", &value);
+			else if (psp_button_names[i].key == CTRL_R2) controls->Get("Dev-kit R2", &value);
+			else if (psp_button_names[i].key == CTRL_L3) controls->Get("Dev-kit L3", &value);
+			else if (psp_button_names[i].key == CTRL_R3) controls->Get("Dev-kit R3", &value);
+		}
 
 		// Erase default mapping
 		g_controllerMap.erase(psp_button_names[i].key);

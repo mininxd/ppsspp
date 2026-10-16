@@ -59,6 +59,7 @@
 #include "UI/TiltAnalogSettingsScreen.h"
 #include "UI/MemStickScreen.h"
 #include "UI/PS2BiosScreen.h"
+#include "Core/PS2/PS2Core.h"
 #include "UI/Theme.h"
 #include "UI/RetroAchievementScreens.h"
 #include "UI/OnScreenDisplay.h"
@@ -1361,6 +1362,11 @@ void GameSettingsScreen::CreateSystemSettings(UI::ViewGroup *systemSettings) {
 	sizeChoice->SetFormat("%d GB");
 
 	systemSettings->Add(new ItemHeader("PlayStation 2"));
+	if (PS2::PS2Core::GetInstance().IsBIOSAvailable()) {
+		systemSettings->Add(new Choice("Run PS2 BIOS", ImageID("I_PLAY")))->OnClick.Add([this](UI::EventParams &) {
+			screenManager()->switchScreen(new EmuScreen(Path("BOOT_PS2_BIOS")));
+		});
+	}
 	systemSettings->Add(new Choice("Configure PS2 BIOS..."))->OnClick.Add([this](UI::EventParams &) {
 		screenManager()->push(new PS2BiosScreen(false));
 	});

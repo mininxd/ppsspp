@@ -48,6 +48,7 @@
 #include "Core/HLE/sceKernelThread.h"
 #include "Core/MIPS/MIPSTracer.h"
 #include "Core/CoreTiming.h"
+#include "Core/PS2/PS2Core.h"
 
 #include "GPU/Debugger/Stepping.h"
 #include "GPU/GPU.h"
@@ -434,6 +435,10 @@ void Core_RunLoopUntil(u64 globalticks) {
 			break;
 		}
 		case CORE_RUNNING_CPU:
+			if (PS2::PS2Core::GetInstance().GetState() == PS2::CoreState::RUNNING) {
+				coreState = CORE_NEXTFRAME;
+				break;
+			}
 			mipsr4k.RunLoopUntil(globalticks);
 			if (coreState == CORE_RUNNING_CPU) {
 				// If we are still running, we must have reached the end of a frame.
@@ -652,6 +657,9 @@ static bool Core_ProcessStepping(MIPSDebugInterface *cpu) {
 
 // Free-threaded (hm, possibly except tracing).
 void Core_Break(BreakReason reason, u32 relatedAddress, const BreakpointHit *hit) {
+	if (PS2::PS2Core::GetInstance().GetState() == PS2::CoreState::RUNNING) {
+		return;
+	}
 	const CoreState state = coreState;
 	if (state != CORE_RUNNING_CPU) {
 		if (state == CORE_STEPPING_CPU) {
@@ -837,6 +845,9 @@ static std::string ModuleAddressSuffix(u32 address) {
 }
 
 void Core_MemoryException(u32 address, u32 accessSize, u32 pc, MemoryExceptionType type, std::string_view additionalInfo) {
+	if (PS2::PS2Core::GetInstance().GetState() == PS2::CoreState::RUNNING) {
+		return;
+	}
 	// In jit, we only flush PC when bIgnoreBadMemAccess is off.
 	char pcDetails[128];
 	pcDetails[0] = 0;
@@ -899,6 +910,9 @@ void Core_MemoryException(u32 address, u32 accessSize, u32 pc, MemoryExceptionTy
 }
 
 void Core_MemoryExceptionHLE(MIPSState *mips, u32 address, u32 accessSize, MemoryExceptionType type) {
+	if (PS2::PS2Core::GetInstance().GetState() == PS2::CoreState::RUNNING) {
+		return;
+	}
 	ExceptionAction action;
 	switch (type) {
 	case MemoryExceptionType::HLE_WRITE:
@@ -968,6 +982,9 @@ void Core_MemoryExceptionHLE(MIPSState *mips, u32 address, u32 accessSize, Memor
 // Can't be ignored, must break. If JUMP, not sure we can get a meaningful stack trace here (since the PC is invalid).
 // address != pc when this is called for a jump instruction. pc then is the source address of the jump.
 void Core_ExecException(u32 address, u32 pc, ExecExceptionType type) {
+	if (PS2::PS2Core::GetInstance().GetState() == PS2::CoreState::RUNNING) {
+		return;
+	}
 	const char *desc = ExecExceptionTypeAsString(type);
 
 	char pcStr[32] = "(invalid)";

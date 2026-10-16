@@ -29,6 +29,7 @@
 #include "Common/StringUtils.h"
 #include "Core/Config.h"
 #include "Core/PS2/PS2Core.h"
+#include "UI/EmuScreen.h"
 
 PS2BiosScreen::PS2BiosScreen(bool initialSetup)
 	: UIBaseDialogScreen(), initialSetup_(initialSetup) {
@@ -88,6 +89,10 @@ void PS2BiosScreen::CreateViews() {
 		leftColumn->Add(new TextView(biosText, ALIGN_LEFT, false));
 		std::string pathText = StringFromFormat("Location: %s", currentPath.ToVisualString().c_str());
 		leftColumn->Add(new TextView(pathText, ALIGN_LEFT, false));
+		leftColumn->Add(new Spacer(new LinearLayoutParams(FILL_PARENT, 8.0f, 0.0f)));
+		leftColumn->Add(new Choice("Run PS2 BIOS", ImageID("I_PLAY")))->OnClick.Add([this](UI::EventParams &) {
+			screenManager()->switchScreen(new EmuScreen(Path("BOOT_PS2_BIOS")));
+		});
 	} else {
 		leftColumn->Add(new TextView("Status: No BIOS currently configured.", ALIGN_LEFT, false));
 	}
@@ -128,6 +133,13 @@ void PS2BiosScreen::CreateViews() {
 				OnSelectBios(path);
 			});
 		}
+	}
+
+	if (PS2::PS2Core::GetInstance().IsBIOSAvailable()) {
+		rightColumnItems->Add(new Choice("Run PS2 BIOS", ImageID("I_PLAY")))->OnClick.Add([this](UI::EventParams &) {
+			screenManager()->switchScreen(new EmuScreen(Path("BOOT_PS2_BIOS")));
+		});
+		rightColumnItems->Add(new Spacer(12.0f));
 	}
 
 	if (initialSetup_) {

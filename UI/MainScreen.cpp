@@ -57,6 +57,7 @@
 #include "UI/SystemInfoScreen.h"
 #include "UI/MemStickScreen.h"
 #include "UI/PS2BiosScreen.h"
+#include "Core/PS2/PS2Core.h"
 #include "UI/Store.h"
 #include "UI/MiscScreens.h"
 #include "Core/Config.h"
@@ -316,6 +317,11 @@ void MainScreen::CreateMainButtons(UI::ViewGroup *parent, bool portrait) {
 	if (System_GetPropertyBool(SYSPROP_HAS_FILE_BROWSER)) {
 		parent->Add(portrait ? new Choice(ImageID("I_FOLDER_OPEN"), portrait ? new LinearLayoutParams() : nullptr) : new Choice(mm->T("Load", "Load...")))->OnClick.Handle(this, &MainScreen::OnLoadFile);
 	}
+	if (PS2::PS2Core::GetInstance().IsBIOSAvailable()) {
+		parent->Add(portrait ? new Choice(ImageID("I_PLAY"), portrait ? new LinearLayoutParams() : nullptr) : new Choice("Run PS2 BIOS", ImageID("I_PLAY")))->OnClick.Add([this](UI::EventParams &) {
+			screenManager()->switchScreen(new EmuScreen(Path("BOOT_PS2_BIOS")));
+		});
+	}
 	parent->Add(portrait ? new Choice(ImageID("I_GEAR"), portrait ? new LinearLayoutParams() : nullptr) : new Choice(mm->T("Game Settings", "Settings")))->OnClick.Handle(this, &MainScreen::OnGameSettings);
 	parent->Add(portrait ? new Choice(ImageID("I_INFO"), portrait ? new LinearLayoutParams() : nullptr) : new Choice(mm->T("About PPSSPP")))->OnClick.Handle(this, &MainScreen::OnCredits);
 
@@ -439,6 +445,16 @@ void MainScreen::PopulateXMBCategories() {
 			screenManager()->push(new PS2BiosScreen(false));
 		};
 		cat.items.push_back(ps2BiosItem);
+
+		if (PS2::PS2Core::GetInstance().IsBIOSAvailable()) {
+			XMBItem runBiosItem;
+			runBiosItem.title = "Run PS2 BIOS";
+			runBiosItem.icon = ImageID("I_PLAY");
+			runBiosItem.onSelect = [this]() {
+				screenManager()->switchScreen(new EmuScreen(Path("BOOT_PS2_BIOS")));
+			};
+			cat.items.push_back(runBiosItem);
+		}
 
 		categories.push_back(cat);
 	}

@@ -44,6 +44,7 @@ public:
 		categoryToggles_[1] = true;
 		categoryToggles_[2] = true;
 		categoryToggles_[3] = false;
+		categoryToggles_[4] = true;
 	}
 	const char *tag() const override { return "ControlMapping"; }
 

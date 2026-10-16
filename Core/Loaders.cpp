@@ -77,6 +77,10 @@ IdentifiedFileType Identify_File(FileLoader *fileLoader, std::string *errorStrin
 		return IdentifiedFileType::ERROR_IDENTIFYING;
 	}
 
+	if (fileLoader->GetPath().ToString() == "BOOT_PS2_BIOS" || fileLoader->GetPath().GetFilename() == "BOOT_PS2_BIOS" || fileLoader->GetPath().ToString() == "ps2_bios") {
+		return IdentifiedFileType::PS2_ISO;
+	}
+
 	std::string extension = fileLoader->GetFileExtension();
 
 	// First, check if it's a directory with an EBOOT.PBP in it.

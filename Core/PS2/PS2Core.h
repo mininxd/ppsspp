@@ -20,6 +20,7 @@
 #include <string>
 #include <vector>
 #include <mutex>
+#include <thread>
 #include "Common/File/Path.h"
 
 namespace PS2 {
@@ -107,7 +108,7 @@ private:
 
 	CoreState state_ = CoreState::UNINITIALIZED;
 	std::string lastError_;
-	mutable std::mutex mutex_;
+	mutable std::recursive_mutex mutex_;
 	void *libHandle_ = nullptr;
 	Path dataDir_;
 	Path cacheDir_;
@@ -125,6 +126,7 @@ private:
 	void *fnGetBIOSDescription_ = nullptr;
 	void *fnHandleControllerAxisEvent_ = nullptr;
 	void *fnHandleControllerButtonEvent_ = nullptr;
+	std::thread vmThread_;
 };
 
 } // namespace PS2

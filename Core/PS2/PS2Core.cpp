@@ -25,6 +25,11 @@
 #include <dlfcn.h>
 #endif
 
+#if defined(__ANDROID__)
+#include <jni.h>
+extern JavaVM *gJvm;
+#endif
+
 #include "Common/Log.h"
 #include "Common/StringUtils.h"
 #include "Common/File/FileUtil.h"
@@ -51,7 +56,7 @@ PS2Core::~PS2Core() {
 }
 
 bool PS2Core::Initialize(const Path &dataDir, const Path &cacheDir) {
-	std::lock_guard<std::mutex> lock(mutex_);
+	std::lock_guard<std::recursive_mutex> lock(mutex_);
 	dataDir_ = dataDir;
 	cacheDir_ = cacheDir;
 
@@ -67,7 +72,7 @@ bool PS2Core::Initialize(const Path &dataDir, const Path &cacheDir) {
 }
 
 void PS2Core::Shutdown() {
-	std::lock_guard<std::mutex> lock(mutex_);
+	std::lock_guard<std::recursive_mutex> lock(mutex_);
 	if (state_ == CoreState::RUNNING) {
 		Stop(true);
 	}
@@ -111,16 +116,22 @@ bool PS2Core::LoadNativeLibrary() {
 
 	fnInitialize_ = dlsym(libHandle_, "Java_xyz_aethersx2_android_NativeLibrary_initialize");
 	fnRunVMThread_ = dlsym(libHandle_, "Java_xyz_aethersx2_android_NativeLibrary_runVMThread");
+	if (!fnRunVMThread_) fnRunVMThread_ = dlsym(libHandle_, "Java_kr_co_iefriends_pcsx2_NativeApp_runVMThread");
 	fnStopVMThreadLoop_ = dlsym(libHandle_, "Java_xyz_aethersx2_android_NativeLibrary_stopVMThreadLoop");
+	if (!fnStopVMThreadLoop_) fnStopVMThreadLoop_ = dlsym(libHandle_, "Java_kr_co_iefriends_pcsx2_NativeApp_shutdown");
 	fnPauseVM_ = dlsym(libHandle_, "Java_xyz_aethersx2_android_NativeLibrary_pauseVM");
+	if (!fnPauseVM_) fnPauseVM_ = dlsym(libHandle_, "Java_kr_co_iefriends_pcsx2_NativeApp_pause");
 	fnIsVMPaused_ = dlsym(libHandle_, "Java_xyz_aethersx2_android_NativeLibrary_isVMPaused");
 	fnResetVM_ = dlsym(libHandle_, "Java_xyz_aethersx2_android_NativeLibrary_resetVM");
 	fnChangeSurface_ = dlsym(libHandle_, "Java_xyz_aethersx2_android_NativeLibrary_changeSurface");
+	if (!fnChangeSurface_) fnChangeSurface_ = dlsym(libHandle_, "Java_kr_co_iefriends_pcsx2_NativeApp_onNativeSurfaceChanged");
 	fnChangeDisc_ = dlsym(libHandle_, "Java_xyz_aethersx2_android_NativeLibrary_changeDisc");
+	if (!fnChangeDisc_) fnChangeDisc_ = dlsym(libHandle_, "Java_kr_co_iefriends_pcsx2_NativeApp_changeDisc");
 	fnIsBIOSAvailable_ = dlsym(libHandle_, "Java_xyz_aethersx2_android_NativeLibrary_isBIOSAvailable");
 	fnGetBIOSDescription_ = dlsym(libHandle_, "Java_xyz_aethersx2_android_NativeLibrary_getBIOSDescription");
 	fnHandleControllerAxisEvent_ = dlsym(libHandle_, "Java_xyz_aethersx2_android_NativeLibrary_handleControllerAxisEvent");
 	fnHandleControllerButtonEvent_ = dlsym(libHandle_, "Java_xyz_aethersx2_android_NativeLibrary_handleControllerButtonEvent");
+	if (!fnHandleControllerButtonEvent_) fnHandleControllerButtonEvent_ = dlsym(libHandle_, "Java_kr_co_iefriends_pcsx2_NativeApp_setPadButton");
 
 	return true;
 #else
@@ -163,7 +174,7 @@ Path PS2Core::GetCurrentBIOSPath() const {
 }
 
 void PS2Core::SetBIOSPath(const Path &path) {
-	std::lock_guard<std::mutex> lock(mutex_);
+	std::lock_guard<std::recursive_mutex> lock(mutex_);
 	currentBiosPath_ = path;
 	g_Config.ps2BiosPath = path;
 }
@@ -307,15 +318,16 @@ void PS2Core::WriteDefaultConfiguration() {
 }
 
 bool PS2Core::Boot(const Path &gamePath, const Path &biosPath) {
-	std::lock_guard<std::mutex> lock(mutex_);
+	std::lock_guard<std::recursive_mutex> lock(mutex_);
 	Path bios = biosPath.empty() ? GetCurrentBIOSPath() : biosPath;
 	if (bios.empty() || !File::Exists(bios)) {
-		lastError_ = "Cannot boot PS2 game: BIOS file not found. Please configure a PS2 BIOS.";
+		lastError_ = "Cannot boot PS2: BIOS file not found. Please configure a PS2 BIOS.";
 		ERROR_LOG(Log::System, "%s", lastError_.c_str());
 		return false;
 	}
 
-	if (!File::Exists(gamePath)) {
+	bool isBiosBoot = gamePath.empty() || gamePath.ToString() == "BOOT_PS2_BIOS" || gamePath.ToString() == "ps2_bios";
+	if (!isBiosBoot && !File::Exists(gamePath)) {
 		lastError_ = "Cannot boot PS2 game: File not found: " + gamePath.ToString();
 		ERROR_LOG(Log::System, "%s", lastError_.c_str());
 		return false;
@@ -323,20 +335,80 @@ bool PS2Core::Boot(const Path &gamePath, const Path &biosPath) {
 
 	WriteDefaultConfiguration();
 
+	if (vmThread_.joinable()) {
+		if (fnStopVMThreadLoop_) {
+#if defined(__ANDROID__)
+			if (gJvm) {
+				JNIEnv *env = nullptr;
+				gJvm->AttachCurrentThread(&env, nullptr);
+				typedef void (*StopFn)(JNIEnv *, jclass);
+				((StopFn)fnStopVMThreadLoop_)(env, nullptr);
+				gJvm->DetachCurrentThread();
+			} else
+#endif
+			{
+				typedef void (*StopFn)(void *, void *);
+				((StopFn)fnStopVMThreadLoop_)(nullptr, nullptr);
+			}
+		}
+		vmThread_.join();
+	}
+
 	state_ = CoreState::RUNNING;
-	INFO_LOG(Log::System, "PS2Core: Booting PS2 title '%s' with BIOS '%s' on %s renderer",
-		gamePath.c_str(), bios.c_str(), PS2GPUBackendToString((PS2GPUBackend)g_Config.iPS2GPUBackend));
+	INFO_LOG(Log::System, "PS2Core: Booting PS2 %s with BIOS '%s' on %s renderer",
+		isBiosBoot ? "BIOS" : gamePath.c_str(), bios.c_str(), PS2GPUBackendToString((PS2GPUBackend)g_Config.iPS2GPUBackend));
+
+	if (fnRunVMThread_) {
+		std::string pathStr = isBiosBoot ? "" : gamePath.ToString();
+		vmThread_ = std::thread([this, pathStr]() {
+#if defined(__ANDROID__)
+			if (gJvm) {
+				JNIEnv *env = nullptr;
+				gJvm->AttachCurrentThread(&env, nullptr);
+				jstring jpath = env->NewStringUTF(pathStr.c_str());
+				typedef jboolean (*RunVMFn)(JNIEnv *, jclass, jstring);
+				((RunVMFn)fnRunVMThread_)(env, nullptr, jpath);
+				env->DeleteLocalRef(jpath);
+				gJvm->DetachCurrentThread();
+			} else
+#endif
+			{
+				typedef bool (*RunVMFn)(void *, void *, const char *);
+				((RunVMFn)fnRunVMThread_)(nullptr, nullptr, pathStr.c_str());
+			}
+			INFO_LOG(Log::System, "PS2Core: VM thread terminated.");
+		});
+	}
+
 	return true;
 }
 
 void PS2Core::Stop(bool waitForShutdown) {
-	std::lock_guard<std::mutex> lock(mutex_);
+	std::lock_guard<std::recursive_mutex> lock(mutex_);
+	if (fnStopVMThreadLoop_) {
+#if defined(__ANDROID__)
+		if (gJvm) {
+			JNIEnv *env = nullptr;
+			gJvm->AttachCurrentThread(&env, nullptr);
+			typedef void (*StopFn)(JNIEnv *, jclass);
+			((StopFn)fnStopVMThreadLoop_)(env, nullptr);
+			gJvm->DetachCurrentThread();
+		} else
+#endif
+		{
+			typedef void (*StopFn)(void *, void *);
+			((StopFn)fnStopVMThreadLoop_)(nullptr, nullptr);
+		}
+	}
+	if (waitForShutdown && vmThread_.joinable()) {
+		vmThread_.join();
+	}
 	state_ = CoreState::STOPPED;
 	INFO_LOG(Log::System, "PS2Core: Emulation stopped.");
 }
 
 void PS2Core::Pause(bool paused) {
-	std::lock_guard<std::mutex> lock(mutex_);
+	std::lock_guard<std::recursive_mutex> lock(mutex_);
 	if (state_ == CoreState::RUNNING && paused) {
 		state_ = CoreState::PAUSED;
 	} else if (state_ == CoreState::PAUSED && !paused) {
@@ -349,19 +421,55 @@ bool PS2Core::IsPaused() const {
 }
 
 void PS2Core::Reset() {
-	std::lock_guard<std::mutex> lock(mutex_);
+	std::lock_guard<std::recursive_mutex> lock(mutex_);
 	INFO_LOG(Log::System, "PS2Core: Resetting VM.");
 }
 
 void PS2Core::SetSurface(void *surface, int width, int height, float scale) {
-	std::lock_guard<std::mutex> lock(mutex_);
+	std::lock_guard<std::recursive_mutex> lock(mutex_);
 	INFO_LOG(Log::G3D, "PS2Core: Surface updated: %p (%dx%d, scale=%.2f)", surface, width, height, scale);
 }
 
 void PS2Core::HandleAxis(int controller, int axis, float value) {
+#if defined(__unix__) || defined(__APPLE__) || defined(__ANDROID__)
+	std::lock_guard<std::recursive_mutex> lock(mutex_);
+	if (!libHandle_ || !fnHandleControllerAxisEvent_) {
+		return;
+	}
+#if defined(__ANDROID__)
+	if (gJvm) {
+		JNIEnv *env = nullptr;
+		gJvm->AttachCurrentThread(&env, nullptr);
+		typedef void (*AxisFn)(JNIEnv *, jclass, jint, jint, jfloat);
+		((AxisFn)fnHandleControllerAxisEvent_)(env, nullptr, controller, axis, value);
+		gJvm->DetachCurrentThread();
+		return;
+	}
+#endif
+	typedef void (*AxisFn)(void *, void *, int, int, float);
+	((AxisFn)fnHandleControllerAxisEvent_)(nullptr, nullptr, controller, axis, value);
+#endif
 }
 
 void PS2Core::HandleButton(int controller, int button, bool down) {
+#if defined(__unix__) || defined(__APPLE__) || defined(__ANDROID__)
+	std::lock_guard<std::recursive_mutex> lock(mutex_);
+	if (!libHandle_ || !fnHandleControllerButtonEvent_) {
+		return;
+	}
+#if defined(__ANDROID__)
+	if (gJvm) {
+		JNIEnv *env = nullptr;
+		gJvm->AttachCurrentThread(&env, nullptr);
+		typedef void (*BtnFn)(JNIEnv *, jclass, jint, jint, jboolean);
+		((BtnFn)fnHandleControllerButtonEvent_)(env, nullptr, controller, button, down);
+		gJvm->DetachCurrentThread();
+		return;
+	}
+#endif
+	typedef void (*BtnFn)(void *, void *, int, int, bool);
+	((BtnFn)fnHandleControllerButtonEvent_)(nullptr, nullptr, controller, button, down);
+#endif
 }
 
 } // namespace PS2

@@ -472,7 +472,11 @@ static bool CPU_Init(FileLoader *fileLoader, IdentifiedFileType type, std::strin
 			*errorString = PS2::PS2Core::GetInstance().GetLastError();
 			return false;
 		}
-		gameTitle = g_CoreParameter.fileToStart.GetFilename();
+		if (g_CoreParameter.fileToStart.ToString() == "BOOT_PS2_BIOS" || g_CoreParameter.fileToStart.GetFilename() == "BOOT_PS2_BIOS" || g_CoreParameter.fileToStart.ToString() == "ps2_bios") {
+			gameTitle = "PlayStation 2 BIOS";
+		} else {
+			gameTitle = g_CoreParameter.fileToStart.GetFilename();
+		}
 		break;
 	}
 	default:
@@ -647,7 +651,7 @@ static bool CPU_Init(FileLoader *fileLoader, IdentifiedFileType type, std::strin
 		return false;
 	}
 
-	if (g_CoreParameter.updateRecent) {
+	if (g_CoreParameter.updateRecent && g_CoreParameter.fileToStart.ToString() != "BOOT_PS2_BIOS" && g_CoreParameter.fileToStart.ToString() != "ps2_bios") {
 		g_recentFiles.Add(g_CoreParameter.fileToStart.ToString());
 	}
 
@@ -963,6 +967,10 @@ void PSP_Shutdown(bool success) {
 }
 
 void PSP_RunLoopWhileState() {
+	if (PS2::PS2Core::GetInstance().GetState() == PS2::CoreState::RUNNING) {
+		coreState = CORE_NEXTFRAME;
+		return;
+	}
 	// We just run the CPU until we get to vblank. This will quickly sync up pretty nicely.
 	// The actual number of cycles doesn't matter so much here as we will break due to CORE_NEXTFRAME, most of the time hopefully...
 	int blockTicks = usToCycles(1000000 / 10);

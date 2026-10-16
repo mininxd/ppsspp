@@ -59,6 +59,7 @@ using namespace std::placeholders;
 #include "Core/KeyMap.h"
 #include "Core/MemFault.h"
 #include "Core/Reporting.h"
+#include "Core/PS2/PS2Core.h"
 #include "Core/Util/PathUtil.h"
 #include "Core/System.h"
 #include "GPU/Common/PresentationCommon.h"
@@ -112,6 +113,36 @@ void EmuScreen::UpdatePSPButtons(uint32_t bitsToSet, uint32_t bitsToClear) {
 		bitsToSet = 0;
 	}
 	__CtrlUpdateButtons(bitsToSet, bitsToClear);
+
+	if (PS2::PS2Core::GetInstance().GetState() == PS2::CoreState::RUNNING) {
+		struct BtnMap { uint32_t psp; int ps2; };
+		static const BtnMap s_maps[] = {
+			{ CTRL_UP, 19 },
+			{ CTRL_DOWN, 20 },
+			{ CTRL_LEFT, 21 },
+			{ CTRL_RIGHT, 22 },
+			{ CTRL_CROSS, 96 },
+			{ CTRL_CIRCLE, 97 },
+			{ CTRL_SQUARE, 99 },
+			{ CTRL_TRIANGLE, 100 },
+			{ CTRL_LTRIGGER, 102 },
+			{ CTRL_RTRIGGER, 103 },
+			{ CTRL_L2, 104 },
+			{ CTRL_R2, 105 },
+			{ CTRL_L3, 106 },
+			{ CTRL_R3, 107 },
+			{ CTRL_START, 108 },
+			{ CTRL_SELECT, 109 },
+		};
+		for (const auto &m : s_maps) {
+			if (bitsToSet & m.psp) {
+				PS2::PS2Core::GetInstance().HandleButton(0, m.ps2, true);
+			}
+			if (bitsToClear & m.psp) {
+				PS2::PS2Core::GetInstance().HandleButton(0, m.ps2, false);
+			}
+		}
+	}
 }
 
 void EmuScreen::SetPSPAnalog(int iInternalScreenRotation, int stick, float x, float y) {
@@ -146,6 +177,11 @@ void EmuScreen::SetPSPAnalog(int iInternalScreenRotation, int stick, float x, fl
 		break;
 	}
 	__CtrlSetAnalogXY(stick, x, y);
+
+	if (PS2::PS2Core::GetInstance().GetState() == PS2::CoreState::RUNNING) {
+		PS2::PS2Core::GetInstance().HandleAxis(0, stick * 2, x);
+		PS2::PS2Core::GetInstance().HandleAxis(0, stick * 2 + 1, y);
+	}
 }
 
 EmuScreen::EmuScreen(const Path &filename)
@@ -1742,7 +1778,12 @@ ScreenRenderFlags EmuScreen::RunEmulation(bool skipBufferEffects) {
 			}
 		}
 
-		PSP_RunLoopWhileState();
+		if (PS2::PS2Core::GetInstance().GetState() == PS2::CoreState::RUNNING) {
+			Core_ProcessCPUQueue();
+			coreState = CORE_NEXTFRAME;
+		} else {
+			PSP_RunLoopWhileState();
+		}
 
 		// Hopefully, after running, coreState is now CORE_NEXTFRAME
 		switch (coreState) {
