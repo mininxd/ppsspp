@@ -1089,6 +1089,7 @@ static const ConfigSetting systemParamSettings[] = {
 	ConfigSetting("MemStickSize", SETTING(g_Config, iMemStickSizeGB), 16, CfgFlag::DEFAULT),
 	ConfigSetting("PS2BiosPath", SETTING(g_Config, ps2BiosPath), Path(), CfgFlag::DEFAULT),
 	ConfigSetting("PS2BiosPromptShown", SETTING(g_Config, bPS2BiosPromptShown), false, CfgFlag::DEFAULT),
+	ConfigSetting("PS2GPUBackend", SETTING(g_Config, iPS2GPUBackend), 0, CfgFlag::DEFAULT),
 };
 
 static const ConfigSetting debuggerSettings[] = {

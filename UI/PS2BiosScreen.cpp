@@ -96,6 +96,10 @@ void PS2BiosScreen::CreateViews() {
 		leftColumn->Add(new TextView(statusMessage_, ALIGN_LEFT, false));
 	}
 
+	leftColumn->Add(new Spacer(new LinearLayoutParams(FILL_PARENT, 12.0f, 0.0f)));
+	leftColumn->Add(new ItemHeader("Graphics Backend"));
+	leftColumn->Add(new TextView("Renderer: Vulkan (Default)", ALIGN_LEFT, false));
+
 	leftColumn->Add(new Spacer(new LinearLayoutParams(FILL_PARENT, 16.0f, 0.0f)));
 	leftColumn->Add(new ItemHeader("Import & Select"));
 

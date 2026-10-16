@@ -624,6 +624,7 @@ public:
 	// PlayStation 2 emulation
 	Path ps2BiosPath;
 	bool bPS2BiosPromptShown = false;
+	int iPS2GPUBackend = 0;  // 0 = Vulkan (Default), 1 = OpenGL, 2 = Software
 
 
 	// Virtual reality

@@ -59,6 +59,7 @@ bool PS2Core::Initialize(const Path &dataDir, const Path &cacheDir) {
 	File::CreateFullPath(cacheDir_);
 	File::CreateFullPath(GetDefaultBIOSDirectory());
 
+	WriteDefaultConfiguration();
 	LoadNativeLibrary();
 	state_ = CoreState::INITIALIZED;
 	INFO_LOG(Log::System, "PS2Core initialized. Data: %s, Cache: %s", dataDir_.c_str(), cacheDir_.c_str());
@@ -250,6 +251,61 @@ bool PS2Core::ImportBIOS(const Path &sourcePath, Path *outDestPath) {
 	return true;
 }
 
+PS2GPUBackend PS2Core::GetRenderer() const {
+	return (PS2GPUBackend)g_Config.iPS2GPUBackend;
+}
+
+void PS2Core::SetRenderer(PS2GPUBackend renderer) {
+	g_Config.iPS2GPUBackend = (int)renderer;
+	WriteDefaultConfiguration();
+}
+
+void PS2Core::WriteDefaultConfiguration() {
+	Path configDir = dataDir_.empty() ? (GetSysDirectory(DIRECTORY_SYSTEM) / "PS2") : dataDir_;
+	Path inisDir = configDir / "inis";
+	File::CreateFullPath(inisDir);
+
+	int rendererVal = PS2GPUBackendToGSRenderer((PS2GPUBackend)g_Config.iPS2GPUBackend);
+
+	Path iniFiles[] = {
+		inisDir / "PCSX2.ini",
+		inisDir / "AetherSX2.ini",
+	};
+
+	for (const auto &iniPath : iniFiles) {
+		std::string content;
+		if (File::Exists(iniPath)) {
+			File::ReadTextFileToString(iniPath, &content);
+		}
+
+		if (content.find("[EmuCore/GS]") == std::string::npos) {
+			content += StringFromFormat("\n[EmuCore/GS]\nRenderer = %d\n", rendererVal);
+		} else {
+			size_t gsPos = content.find("[EmuCore/GS]");
+			size_t nextSec = content.find("[", gsPos + 12);
+			size_t endPos = (nextSec == std::string::npos) ? content.size() : nextSec;
+			std::string section = content.substr(gsPos, endPos - gsPos);
+
+			size_t renPos = section.find("Renderer");
+			if (renPos != std::string::npos) {
+				size_t lineEnd = section.find("\n", renPos);
+				if (lineEnd == std::string::npos) {
+					lineEnd = section.size();
+				}
+				section.replace(renPos, lineEnd - renPos, StringFromFormat("Renderer = %d", rendererVal));
+			} else {
+				section += StringFromFormat("Renderer = %d\n", rendererVal);
+			}
+			content.replace(gsPos, endPos - gsPos, section);
+		}
+
+		File::WriteTextFile(iniPath, content);
+	}
+
+	INFO_LOG(Log::System, "PS2Core: Rendering backend configured to %s (Renderer=%d)",
+		PS2GPUBackendToString((PS2GPUBackend)g_Config.iPS2GPUBackend), rendererVal);
+}
+
 bool PS2Core::Boot(const Path &gamePath, const Path &biosPath) {
 	std::lock_guard<std::mutex> lock(mutex_);
 	Path bios = biosPath.empty() ? GetCurrentBIOSPath() : biosPath;
@@ -265,8 +321,11 @@ bool PS2Core::Boot(const Path &gamePath, const Path &biosPath) {
 		return false;
 	}
 
+	WriteDefaultConfiguration();
+
 	state_ = CoreState::RUNNING;
-	INFO_LOG(Log::System, "PS2Core: Booting PS2 title '%s' with BIOS '%s'", gamePath.c_str(), bios.c_str());
+	INFO_LOG(Log::System, "PS2Core: Booting PS2 title '%s' with BIOS '%s' on %s renderer",
+		gamePath.c_str(), bios.c_str(), PS2GPUBackendToString((PS2GPUBackend)g_Config.iPS2GPUBackend));
 	return true;
 }
 

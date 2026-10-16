@@ -1364,6 +1364,8 @@ void GameSettingsScreen::CreateSystemSettings(UI::ViewGroup *systemSettings) {
 	systemSettings->Add(new Choice("Configure PS2 BIOS..."))->OnClick.Add([this](UI::EventParams &) {
 		screenManager()->push(new PS2BiosScreen(false));
 	});
+	static const char *ps2Renderers[] = { "Vulkan (Default)", "OpenGL", "Software" };
+	systemSettings->Add(new PopupMultiChoice(&g_Config.iPS2GPUBackend, "PS2 Graphics Backend", ps2Renderers, 0, ARRAY_SIZE(ps2Renderers), I18NCat::GRAPHICS, screenManager()));
 
 	systemSettings->Add(new ItemHeader(sy->T("Help the PPSSPP team")));
 	if (!enableReportsSet_)

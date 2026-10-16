@@ -488,6 +488,17 @@ public class PpssppActivity extends AppCompatActivity implements SensorEventList
 
 		sendInitialGrants();
 
+		// Ensure PS2 GS renderer default is set to Vulkan (value "14")
+		try {
+			android.content.SharedPreferences ps2Prefs = getSharedPreferences(getPackageName() + "_preferences", MODE_PRIVATE);
+			if (!ps2Prefs.contains("EmuCore/GS/Renderer")) {
+				ps2Prefs.edit().putString("EmuCore/GS/Renderer", "14").apply();
+				Log.i(TAG, "Initialized default PS2 renderer to Vulkan (14)");
+			}
+		} catch (Exception e) {
+			Log.w(TAG, "Failed to initialize PS2 renderer preference: " + e);
+		}
+
 		// OK, config should be initialized, we can query for screen rotation.
 		updateScreenRotation("Initialize");
 

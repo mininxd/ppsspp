@@ -33,6 +33,30 @@ enum class CoreState {
 	ERROR_STATE,
 };
 
+enum class PS2GPUBackend : int {
+	VULKAN = 0,
+	OPENGL = 1,
+	SOFTWARE = 2,
+};
+
+inline int PS2GPUBackendToGSRenderer(PS2GPUBackend backend) {
+	switch (backend) {
+	case PS2GPUBackend::OPENGL: return 12;
+	case PS2GPUBackend::SOFTWARE: return 13;
+	case PS2GPUBackend::VULKAN:
+	default: return 14;
+	}
+}
+
+inline const char *PS2GPUBackendToString(PS2GPUBackend backend) {
+	switch (backend) {
+	case PS2GPUBackend::OPENGL: return "OpenGL";
+	case PS2GPUBackend::SOFTWARE: return "Software";
+	case PS2GPUBackend::VULKAN:
+	default: return "Vulkan";
+	}
+}
+
 struct BIOSInfo {
 	Path path;
 	std::string description;
@@ -59,6 +83,10 @@ public:
 	std::vector<BIOSInfo> ScanBIOSDirectory(const Path &dir);
 	bool ValidateBIOS(const Path &biosPath, BIOSInfo *outInfo = nullptr);
 	bool ImportBIOS(const Path &sourcePath, Path *outDestPath = nullptr);
+
+	PS2GPUBackend GetRenderer() const;
+	void SetRenderer(PS2GPUBackend renderer);
+	void WriteDefaultConfiguration();
 
 	bool Boot(const Path &gamePath, const Path &biosPath = Path());
 	void Stop(bool waitForShutdown = true);
