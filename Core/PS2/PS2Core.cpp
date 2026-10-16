@@ -147,7 +147,7 @@ bool PS2Core::IsBIOSAvailable() const {
 	Path defaultDir = GetDefaultBIOSDirectory();
 	if (File::Exists(defaultDir)) {
 		std::vector<File::FileInfo> files;
-		getFilesInDir(defaultDir, &files, "bin:rom:ROM:BIN:");
+		File::GetFilesInDir(defaultDir, &files, "bin:rom:ROM:BIN:");
 		if (!files.empty()) {
 			return true;
 		}
@@ -213,7 +213,7 @@ std::vector<BIOSInfo> PS2Core::ScanBIOSDirectory(const Path &dir) {
 	}
 
 	std::vector<File::FileInfo> files;
-	getFilesInDir(dir, &files, "bin:rom:ROM:BIN:gz:");
+	File::GetFilesInDir(dir, &files, "bin:rom:ROM:BIN:gz:");
 	for (const auto &file : files) {
 		if (file.isDirectory) {
 			continue;
@@ -299,7 +299,7 @@ void PS2Core::WriteDefaultConfiguration() {
 			content.replace(gsPos, endPos - gsPos, section);
 		}
 
-		File::WriteTextFile(iniPath, content);
+		File::WriteStringToFile(true, content, iniPath);
 	}
 
 	INFO_LOG(Log::System, "PS2Core: Rendering backend configured to %s (Renderer=%d)",
