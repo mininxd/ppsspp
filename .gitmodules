@@ -76,3 +76,6 @@
 	path = pcsx2
 	url = https://github.com/pcsx2/pcsx2.git
 
+[submodule "nethersx2"]
+	path = nethersx2
+	url = https://github.com/mininxd/NetherSX2-patch/

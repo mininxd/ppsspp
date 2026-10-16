@@ -56,6 +56,7 @@
 #include "UI/DeveloperToolsScreen.h"
 #include "UI/SystemInfoScreen.h"
 #include "UI/MemStickScreen.h"
+#include "UI/PS2BiosScreen.h"
 #include "UI/Store.h"
 #include "UI/MiscScreens.h"
 #include "Core/Config.h"
@@ -430,6 +431,14 @@ void MainScreen::PopulateXMBCategories() {
 			screenManager()->push(new MemStickScreen(false));
 		};
 		cat.items.push_back(memStickItem);
+
+		XMBItem ps2BiosItem;
+		ps2BiosItem.title = "PS2 BIOS";
+		ps2BiosItem.icon = ImageID("I_FOLDER_OPEN");
+		ps2BiosItem.onSelect = [this]() {
+			screenManager()->push(new PS2BiosScreen(false));
+		};
+		cat.items.push_back(ps2BiosItem);
 
 		categories.push_back(cat);
 	}

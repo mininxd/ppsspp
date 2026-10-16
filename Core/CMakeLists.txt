@@ -707,6 +707,8 @@ add_library(Core STATIC
 	Util/PkgUnpack.h
 	Util/RecentFiles.cpp
 	Util/RecentFiles.h
+	PS2/PS2Core.cpp
+	PS2/PS2Core.h
 	${CMAKE_SOURCE_DIR}/ext/disarm.cpp
 	${CMAKE_SOURCE_DIR}/ext/disarm.h
 	${CMAKE_SOURCE_DIR}/ext/riscv-disas.cpp

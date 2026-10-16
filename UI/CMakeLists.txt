@@ -47,6 +47,8 @@ list(APPEND UISource
 	IAPScreen.h
 	MainScreen.h
 	MainScreen.cpp
+	PS2BiosScreen.h
+	PS2BiosScreen.cpp
 	XMBView.h
 	XMBView.cpp
 	GameBrowser.h

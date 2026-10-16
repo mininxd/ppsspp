@@ -290,6 +290,32 @@ androidComponents {
 	}
 }
 
+tasks.register("extractPS2Core") {
+	doLast {
+		val apkFile = rootProject.file("nethersx2/nethersx2.apk")
+		val destDir = file("src/main/jniLibs/arm64-v8a")
+		val destSo = file("src/main/jniLibs/arm64-v8a/libemucore.so")
+		if (apkFile.exists() && !destSo.exists()) {
+			destDir.mkdirs()
+			java.util.zip.ZipFile(apkFile).use { zip ->
+				val entry = zip.getEntry("lib/arm64-v8a/libemucore.so")
+				if (entry != null) {
+					zip.getInputStream(entry).use { input ->
+						destSo.outputStream().use { output ->
+							input.copyTo(output)
+						}
+					}
+					println("Extracted libemucore.so to $destSo (${destSo.length()} bytes)")
+				}
+			}
+		}
+	}
+}
+
+tasks.named("preBuild") {
+	dependsOn("extractPS2Core")
+}
+
 /*
 afterEvaluate {
 	android.sourceSets.getByName("main").assets.srcDirs.forEach {

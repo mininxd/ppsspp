@@ -74,6 +74,7 @@
 #include "Core/Loaders.h"
 #include "Core/PSPLoaders.h"
 #include "Core/ELF/ParamSFO.h"
+#include "Core/PS2/PS2Core.h"
 #include "Core/SaveState.h"
 #include "Core/Util/RecentFiles.h"
 #include "Common/ExceptionHandlerSetup.h"
@@ -461,6 +462,19 @@ static bool CPU_Init(FileLoader *fileLoader, IdentifiedFileType type, std::strin
 		*errorString = er->T("PPSSPP doesn't support UMD Video.");
 		return false;
 	}
+	case IdentifiedFileType::PS2_ISO:
+	{
+		if (!PS2::PS2Core::GetInstance().IsBIOSAvailable()) {
+			*errorString = "PS2 BIOS not found. Please import or set a PS2 BIOS in Settings.";
+			return false;
+		}
+		if (!PS2::PS2Core::GetInstance().Boot(g_CoreParameter.fileToStart)) {
+			*errorString = PS2::PS2Core::GetInstance().GetLastError();
+			return false;
+		}
+		gameTitle = g_CoreParameter.fileToStart.GetFilename();
+		break;
+	}
 	default:
 	{
 		// Trying to boot other things lands us here. We need to return a sensible error string.
@@ -623,6 +637,10 @@ static bool CPU_Init(FileLoader *fileLoader, IdentifiedFileType type, std::strin
 		}
 		break;
 
+	case IdentifiedFileType::PS2_ISO:
+		// Booted via PS2Core
+		break;
+
 	default:
 		GetBootError(type, errorString);
 		g_CoreParameter.fileToStart.clear();
@@ -646,6 +664,9 @@ static bool CPU_Init(FileLoader *fileLoader, IdentifiedFileType type, std::strin
 }
 
 void CPU_Shutdown(bool success) {
+	if (PS2::PS2Core::GetInstance().GetState() == PS2::CoreState::RUNNING) {
+		PS2::PS2Core::GetInstance().Stop(true);
+	}
 	// Held across the whole teardown, not just Memory::Shutdown() further down. Everything below
 	// frees state the debugger UIs read from other threads - kernel objects, the symbol map, the
 	// memory map - and this is the lock they take to be sure none of it goes away mid-read. See

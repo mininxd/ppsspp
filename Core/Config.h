@@ -621,6 +621,10 @@ public:
 	int iFirmwareVersion;
 	bool bBypassOSKWithKeyboard;
 
+	// PlayStation 2 emulation
+	Path ps2BiosPath;
+	bool bPS2BiosPromptShown = false;
+
 
 	// Virtual reality
 	bool bEnableVR;

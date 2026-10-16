@@ -58,6 +58,7 @@
 #include "UI/TouchControlVisibilityScreen.h"
 #include "UI/TiltAnalogSettingsScreen.h"
 #include "UI/MemStickScreen.h"
+#include "UI/PS2BiosScreen.h"
 #include "UI/Theme.h"
 #include "UI/RetroAchievementScreens.h"
 #include "UI/OnScreenDisplay.h"
@@ -1358,6 +1359,11 @@ void GameSettingsScreen::CreateSystemSettings(UI::ViewGroup *systemSettings) {
 	systemSettings->Add(new CheckBox(&g_Config.bMemStickInserted, sy->T("Memory Stick inserted")));
 	UI::PopupSliderChoice *sizeChoice = systemSettings->Add(new PopupSliderChoice(&g_Config.iMemStickSizeGB, 1, 32, 16, sy->T("Memory Stick size", "Memory Stick size"), screenManager(), "GB"));
 	sizeChoice->SetFormat("%d GB");
+
+	systemSettings->Add(new ItemHeader("PlayStation 2"));
+	systemSettings->Add(new Choice("Configure PS2 BIOS..."))->OnClick.Add([this](UI::EventParams &) {
+		screenManager()->push(new PS2BiosScreen(false));
+	});
 
 	systemSettings->Add(new ItemHeader(sy->T("Help the PPSSPP team")));
 	if (!enableReportsSet_)

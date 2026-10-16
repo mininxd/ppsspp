@@ -51,6 +51,7 @@
 #include "Core/Util/MemStick.h"
 
 #include "UI/MemStickScreen.h"
+#include "UI/PS2BiosScreen.h"
 #include "UI/MainScreen.h"
 #include "UI/BaseScreens.h"
 #include "UI/OnScreenDisplay.h"
@@ -385,7 +386,11 @@ void MemStickScreen::UseInternalStorage(UI::EventParams &params) {
 			ERROR_LOG_REPORT(Log::System, "Could not switch memstick path in setup (internal)");
 		}
 		// Don't have a confirmation dialog that would otherwise do it for us, need to just switch directly to the main screen.
-		screenManager()->switchScreen(new MainScreen());
+		if (!g_Config.bPS2BiosPromptShown && g_Config.ps2BiosPath.empty()) {
+			screenManager()->switchScreen(new PS2BiosScreen(true));
+		} else {
+			screenManager()->switchScreen(new MainScreen());
+		}
 	} else if (pendingMemStickFolder != g_Config.memStickDirectory) {
 		// Always ask for confirmation when called from the UI. Likely there's already some data.
 		screenManager()->push(new ConfirmMemstickMoveScreen(pendingMemStickFolder, false));
@@ -682,8 +687,11 @@ void ConfirmMemstickMoveScreen::FinishFolderMove() {
 		// (which we better have been...)
 		if (g_Config.Save("MemstickPathChanged")) {
 			INFO_LOG(Log::System, "Initial setup succeeded. Switching to main screen!");
-			// TriggerFinish(DialogResult::DR_OK);
-			screenManager()->switchScreen(new MainScreen());
+			if (!g_Config.bPS2BiosPromptShown && g_Config.ps2BiosPath.empty()) {
+				screenManager()->switchScreen(new PS2BiosScreen(true));
+			} else {
+				screenManager()->switchScreen(new MainScreen());
+			}
 		} else {
 			INFO_LOG(Log::System, "Initial setup failed.");
 			error_ = ms->T("Failed to save config");

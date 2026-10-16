@@ -886,6 +886,7 @@ EXEC_AND_LIB_FILES := \
   $(SRC)/Core/Util/PkgUnpack.cpp \
   $(SRC)/Core/Util/RecentFiles.cpp \
   $(SRC)/Core/Util/VideoPlayer.cpp \
+  $(SRC)/Core/PS2/PS2Core.cpp \
   $(SRC)/git-version.cpp
 
 LOCAL_MODULE := ppsspp_core
@@ -1031,6 +1032,7 @@ LOCAL_SRC_FILES := \
   $(SRC)/UI/EmuScreen.cpp \
   $(SRC)/UI/GameBrowser.cpp \
   $(SRC)/UI/MainScreen.cpp \
+  $(SRC)/UI/PS2BiosScreen.cpp \
   $(SRC)/UI/XMBView.cpp \
   $(SRC)/UI/TabbedDialogScreen.cpp \
   $(SRC)/UI/AdhocServerScreen.cpp \

@@ -58,6 +58,8 @@
 #include "UI/BackgroundAudio.h"
 #include "UI/SavedataScreen.h"
 #include "UI/MiscViews.h"
+#include "UI/PS2BiosScreen.h"
+#include "Core/PS2/PS2Core.h"
 
 // This is in an objective-C file.
 #if PPSSPP_PLATFORM(IOS)
@@ -255,7 +257,6 @@ static bool FileTypeIsPlayable(IdentifiedFileType fileType) {
 	case IdentifiedFileType::ERROR_IDENTIFYING:
 	case IdentifiedFileType::UNKNOWN:
 	case IdentifiedFileType::PSX_ISO:
-	case IdentifiedFileType::PS2_ISO:
 	case IdentifiedFileType::PS3_ISO:
 	case IdentifiedFileType::UNKNOWN_BIN:
 	case IdentifiedFileType::UNKNOWN_ELF:
@@ -568,6 +569,10 @@ void GameScreen::CreateSettingsViews(UI::ViewGroup *rightColumn) {
 
 	if (!inGame_ && FileTypeIsPlayable(info_->fileType)) {
 		rightColumnItems->Add(new Choice(ga->T("Play"), ImageID("I_PLAY")))->OnClick.Add([this](UI::EventParams &e) {
+			if (info_->fileType == IdentifiedFileType::PS2_ISO && !PS2::PS2Core::GetInstance().IsBIOSAvailable()) {
+				screenManager()->pushScreen(new PS2BiosScreen(false));
+				return;
+			}
 			screenManager()->switchScreen(new EmuScreen(gamePath_));
 		});
 	}

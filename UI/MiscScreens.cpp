@@ -59,6 +59,7 @@
 #include "UI/MainScreen.h"
 #include "UI/MiscScreens.h"
 #include "UI/MemStickScreen.h"
+#include "UI/PS2BiosScreen.h"
 #include "UI/MiscViews.h"
 
 void HandleCommonMessages(UIMessage message, const char *value, ScreenManager *manager, const Screen *activeScreen) {
@@ -380,6 +381,8 @@ void LogoScreen::Next() {
 		default:
 			if (boot_filename.size()) {
 				screenManager()->switchScreen(new EmuScreen(gamePath));
+			} else if (!g_Config.bPS2BiosPromptShown && g_Config.ps2BiosPath.empty()) {
+				screenManager()->switchScreen(new PS2BiosScreen(true));
 			} else {
 				screenManager()->switchScreen(new MainScreen());
 			}
