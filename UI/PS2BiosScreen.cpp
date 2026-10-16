@@ -17,6 +17,7 @@
 
 #include "UI/PS2BiosScreen.h"
 #include "UI/MainScreen.h"
+#include "Common/UI/ScreenManager.h"
 
 #include "Common/UI/UI.h"
 #include "Common/UI/ViewGroup.h"
