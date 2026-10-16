@@ -60,6 +60,22 @@ jobs:
           echo "count=${{steps.valid-tags.outputs.count}}"
           gradle --quiet androidGitVersion
       
+      - name: Extract PS2 Core (libemucore) from NetherSX2
+        shell: bash
+        run: |
+          mkdir -p android/src/main/jniLibs/arm64-v8a
+          if [ -f nethersx2/nethersx2.apk ]; then
+            unzip -p nethersx2/nethersx2.apk lib/arm64-v8a/libemucore.so > android/src/main/jniLibs/arm64-v8a/libemucore.so
+            chmod +x android/src/main/jniLibs/arm64-v8a/libemucore.so
+            echo "Successfully extracted libemucore.so from nethersx2.apk"
+            ls -lh android/src/main/jniLibs/arm64-v8a/
+          elif [ -f nethersx2/apk/adreno/root/lib/arm64-v8a/libemucore.so ]; then
+            cp nethersx2/apk/adreno/root/lib/arm64-v8a/libemucore.so android/src/main/jniLibs/arm64-v8a/
+            chmod +x android/src/main/jniLibs/arm64-v8a/libemucore.so
+            echo "Successfully copied libemucore.so from nethersx2 repo"
+            ls -lh android/src/main/jniLibs/arm64-v8a/
+          fi
+
       - name: Assemble APK
         run: ./gradlew assemble${{ github.event.inputs.buildVariant }} --stacktrace
       

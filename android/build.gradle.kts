@@ -1,3 +1,5 @@
+import java.util.zip.ZipFile
+
 plugins {
 	id("com.android.application")
 	id("com.google.protobuf")
@@ -297,7 +299,7 @@ tasks.register("extractPS2Core") {
 		val destSo = file("src/main/jniLibs/arm64-v8a/libemucore.so")
 		if (apkFile.exists() && !destSo.exists()) {
 			destDir.mkdirs()
-			java.util.zip.ZipFile(apkFile).use { zip ->
+			ZipFile(apkFile).use { zip ->
 				val entry = zip.getEntry("lib/arm64-v8a/libemucore.so")
 				if (entry != null) {
 					zip.getInputStream(entry).use { input ->
