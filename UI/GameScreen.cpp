@@ -570,7 +570,7 @@ void GameScreen::CreateSettingsViews(UI::ViewGroup *rightColumn) {
 	if (!inGame_ && FileTypeIsPlayable(info_->fileType)) {
 		rightColumnItems->Add(new Choice(ga->T("Play"), ImageID("I_PLAY")))->OnClick.Add([this](UI::EventParams &e) {
 			if (info_->fileType == IdentifiedFileType::PS2_ISO && !PS2::PS2Core::GetInstance().IsBIOSAvailable()) {
-				screenManager()->pushScreen(new PS2BiosScreen(false));
+				screenManager()->push(new PS2BiosScreen(false));
 				return;
 			}
 			screenManager()->switchScreen(new EmuScreen(gamePath_));
